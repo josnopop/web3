@@ -44,6 +44,8 @@ jobs:
           symbols = {row.get("symbol") for row in markets.get("results", [])}
           missing = set(MARKETS) - symbols
           if missing:
+              related = sorted(symbol for symbol in symbols if any(asset in str(symbol).upper() for asset in ("BTC", "ETH", "SOL")))
+              print("P01_MARKET_DISCOVERY=" + json.dumps({"missing": sorted(missing), "related": related}, sort_keys=True))
               raise RuntimeError("missing required markets: " + ",".join(sorted(missing)))
 
           async def websocket_probe():
