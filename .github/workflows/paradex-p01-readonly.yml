@@ -51,6 +51,8 @@ jobs:
 
           async def websocket_probe():
               counts = {market: 0 for market in MARKETS}
+              acknowledgements = {market: False for market in MARKETS}
+              request_market = {index: market for index, market in enumerate(MARKETS, 1)}
               seen = []
               async with websockets.connect(
                   WS,
@@ -63,7 +65,7 @@ jobs:
                   for index, market in enumerate(MARKETS, 1):
                       await ws.send(json.dumps({"jsonrpc":"2.0","method":"subscribe","params":{"channel":f"bbo.{market}"},"id":index}))
                   deadline = time.monotonic() + 60
-                  while time.monotonic() < deadline and not all(counts.values()):
+                  while time.monotonic() < deadline and not (all(acknowledgements.values()) and sum(counts.values()) > 0):
                       remaining = max(0.1, deadline - time.monotonic())
                       try:
                           message = json.loads(await asyncio.wait_for(ws.recv(), timeout=min(10, remaining)))
@@ -71,15 +73,18 @@ jobs:
                           continue
                       params = message.get("params") or {}
                       channel = str(params.get("channel") or "")
+                      response_id = message.get("id")
+                      if response_id in request_market and "result" in message and "error" not in message:
+                          acknowledgements[request_market[response_id]] = True
                       if len(seen) < 10:
                           seen.append({"id": message.get("id"), "method": message.get("method"), "channel": channel, "has_result": "result" in message, "has_error": "error" in message})
                       for market in MARKETS:
                           if channel == f"bbo.{market}":
                               counts[market] += 1
-              print("P01_WS_DISCOVERY=" + json.dumps({"counts": counts, "frames": seen}, sort_keys=True))
-              if not all(counts.values()):
-                  raise RuntimeError("websocket missing market messages: " + json.dumps(counts, sort_keys=True))
-              return counts
+              print("P01_WS_DISCOVERY=" + json.dumps({"acknowledgements": acknowledgements, "counts": counts, "frames": seen}, sort_keys=True))
+              if not all(acknowledgements.values()) or sum(counts.values()) == 0:
+                  raise RuntimeError("websocket acceptance failed: " + json.dumps({"acknowledgements": acknowledgements, "counts": counts}, sort_keys=True))
+              return {"acknowledgements": acknowledgements, "market_events": counts}
 
           ws_counts = asyncio.run(websocket_probe())
           latencies = []
