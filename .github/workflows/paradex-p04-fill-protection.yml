@@ -128,7 +128,32 @@ jobs:
 
           try:
               mark = mark_price()
-              entry_price = (mark * Decimal("0.99")).quantize(Decimal("1"), rounding=ROUND_DOWN)
+              book = maker.api_client.fetch_orderbook(market=MARKET, params={"depth": 20})
+              asks = book.get("asks") or []
+              bids = book.get("bids") or []
+
+              def level_price(level):
+                  if isinstance(level, dict):
+                      return Decimal(str(level.get("price") or level.get("px") or "0"))
+                  if isinstance(level, (list, tuple)) and level:
+                      return Decimal(str(level[0]))
+                  return Decimal("0")
+
+              ask_prices = [level_price(level) for level in asks if level_price(level) > 0]
+              best_ask = min(ask_prices) if ask_prices else Decimal("0")
+              entry_price = (
+                  (best_ask - Decimal("1")).quantize(Decimal("1"), rounding=ROUND_DOWN)
+                  if best_ask > 1
+                  else (mark * Decimal("0.90")).quantize(Decimal("1"), rounding=ROUND_DOWN)
+              )
+              print("P04_BOOK_DISCOVERY=" + json.dumps({
+                  "book_keys": sorted(book.keys()),
+                  "asks_count": len(asks),
+                  "bids_count": len(bids),
+                  "best_ask": str(best_ask),
+                  "chosen_entry_price": str(entry_price),
+                  "mark_price": str(mark),
+              }, sort_keys=True), flush=True)
 
               maker_order_id = submit(maker, Order(
                   market=MARKET,
