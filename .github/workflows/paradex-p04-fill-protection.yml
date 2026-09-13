@@ -150,12 +150,27 @@ jobs:
                   size=SIZE,
                   limit_price=entry_price,
                   client_id="p04_entry_" + secrets.token_hex(6),
-                  instruction="IOC",
+                  instruction="GTC",
                   reduce_only=False,
               ))
               maker_size, taker_size = wait_positions(lambda a, b: a < 0 and b > 0)
               entry_filled = maker_size < 0 and taker_size > 0
               if not entry_filled:
+                  maker_state = maker.api_client.fetch_order(order_id=maker_order_id)
+                  taker_state = taker.api_client.fetch_order(order_id=taker_order_id)
+                  maker_fills = maker.api_client.fetch_fills({"market": MARKET}).get("results", [])
+                  taker_fills = taker.api_client.fetch_fills({"market": MARKET}).get("results", [])
+                  diagnostic = {
+                      "maker_status": maker_state.get("status"),
+                      "maker_cancel_reason": maker_state.get("cancel_reason"),
+                      "maker_remaining_size": maker_state.get("remaining_size"),
+                      "taker_status": taker_state.get("status"),
+                      "taker_cancel_reason": taker_state.get("cancel_reason"),
+                      "taker_remaining_size": taker_state.get("remaining_size"),
+                      "maker_fills": len(maker_fills),
+                      "taker_fills": len(taker_fills),
+                  }
+                  print("P04_MATCH_DIAGNOSTIC=" + json.dumps(diagnostic, sort_keys=True), flush=True)
                   raise RuntimeError("two-account entry did not fill")
 
               stop_id = submit(taker, Order(
@@ -217,7 +232,7 @@ jobs:
                   size=taker_size,
                   limit_price=close_price,
                   client_id="p04_close_taker_" + secrets.token_hex(6),
-                  instruction="IOC",
+                  instruction="GTC",
                   reduce_only=True,
               ))
               final_maker, final_taker = wait_positions(lambda a, b: a == 0 and b == 0)
