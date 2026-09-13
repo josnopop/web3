@@ -101,8 +101,8 @@ jobs:
                   latencies.append(latency)
                   for market in MARKETS:
                       bbo, latency = get("/bbo/" + market)
-                      bid = float(bbo.get("bid", 0))
-                      ask = float(bbo.get("ask", 0))
+                      bid = float(bbo.get("bid_price") or bbo.get("bid") or 0)
+                      ask = float(bbo.get("ask_price") or bbo.get("ask") or 0)
                       if bid <= 0 or ask < bid:
                           raise RuntimeError("invalid bbo for " + market)
                       latencies.append(latency)
@@ -112,7 +112,7 @@ jobs:
                   failures += 1
                   consecutive_failures += 1
                   max_consecutive_failures = max(max_consecutive_failures, consecutive_failures)
-                  print(json.dumps({"sample":sample + 1,"ok":False,"error_type":type(error).__name__}))
+                  print(json.dumps({"sample":sample + 1,"ok":False,"error_type":type(error).__name__,"error":str(error)[:240]}), flush=True)
               if sample + 1 < samples:
                   time.sleep(30)
 
