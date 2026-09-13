@@ -93,6 +93,19 @@ jobs:
                   raise RuntimeError("submit response missing id")
               return oid
 
+          def wait_order_open(client, order_id, timeout=15):
+              deadline = time.monotonic() + timeout
+              state = "UNKNOWN"
+              while time.monotonic() < deadline:
+                  order = client.api_client.fetch_order(order_id=order_id)
+                  state = str(order.get("status", "UNKNOWN"))
+                  if state == "OPEN":
+                      return True, state
+                  if state == "CLOSED":
+                      return False, state
+                  time.sleep(0.25)
+              return False, state
+
           def mark_price():
               response = maker.api_client.fetch_markets_summary({"market": MARKET})
               rows = response.get("results", [])
@@ -115,7 +128,7 @@ jobs:
 
           try:
               mark = mark_price()
-              entry_price = mark.quantize(Decimal("1"), rounding=ROUND_DOWN)
+              entry_price = (mark * Decimal("1.02")).quantize(Decimal("1"), rounding=ROUND_DOWN)
 
               maker_order_id = submit(maker, Order(
                   market=MARKET,
@@ -127,13 +140,15 @@ jobs:
                   instruction="POST_ONLY",
                   reduce_only=False,
               ))
-              time.sleep(1)
+              maker_open, maker_state = wait_order_open(maker, maker_order_id)
+              if not maker_open:
+                  raise RuntimeError("entry maker order not OPEN: " + maker_state)
               taker_order_id = submit(taker, Order(
                   market=MARKET,
                   order_type=OrderType.Limit,
                   order_side=OrderSide.Buy,
                   size=SIZE,
-                  limit_price=entry_price + Decimal("1"),
+                  limit_price=entry_price,
                   client_id="p04_entry_" + secrets.token_hex(6),
                   instruction="IOC",
                   reduce_only=False,
@@ -177,7 +192,7 @@ jobs:
                   taker.api_client.cancel_order(oid)
               protection_ids = []
 
-              close_price = (mark * Decimal("0.99")).quantize(Decimal("1"), rounding=ROUND_DOWN)
+              close_price = (mark * Decimal("0.98")).quantize(Decimal("1"), rounding=ROUND_DOWN)
               submit(maker, Order(
                   market=MARKET,
                   order_type=OrderType.Limit,
@@ -188,7 +203,13 @@ jobs:
                   instruction="POST_ONLY",
                   reduce_only=True,
               ))
-              time.sleep(1)
+              close_orders = maker.api_client.fetch_orders({"market": MARKET}).get("results", [])
+              close_maker_id = next((row.get("id") for row in close_orders if row.get("client_id", "").startswith("p04_close_maker_")), None)
+              if not close_maker_id:
+                  raise RuntimeError("close maker lookup failed")
+              close_open, close_state = wait_order_open(maker, close_maker_id)
+              if not close_open:
+                  raise RuntimeError("close maker order not OPEN: " + close_state)
               submit(taker, Order(
                   market=MARKET,
                   order_type=OrderType.Limit,
