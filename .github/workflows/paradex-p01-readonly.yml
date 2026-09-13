@@ -3,6 +3,8 @@ name: Paradex P01 Read-Only Probe
 on:
   push:
     branches: [paradex-p01-probe]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
