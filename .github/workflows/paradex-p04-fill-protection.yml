@@ -208,38 +208,62 @@ jobs:
               if not protection_verified:
                   raise RuntimeError("native protection verification failed")
 
-              for oid in protection_ids:
-                  taker.api_client.cancel_order(oid)
-              protection_ids = []
-
-              close_price = (mark * Decimal("0.98")).quantize(Decimal("1"), rounding=ROUND_DOWN)
               submit(taker, Order(
                   market=MARKET,
-                  order_type=OrderType.Limit,
+                  order_type=OrderType.Market,
                   order_side=OrderSide.Sell,
                   size=taker_size,
-                  limit_price=close_price,
                   client_id="p04_close_taker_" + secrets.token_hex(6),
-                  instruction="GTC",
+                  instruction="IOC",
                   reduce_only=True,
               ))
               final_maker, final_taker = wait_positions(lambda a, b: a == 0 and b == 0)
               reduce_only_close_verified = final_maker == 0 and final_taker == 0
               if not reduce_only_close_verified:
-                  raise RuntimeError("paired reduce-only close did not flatten both accounts")
+                  raise RuntimeError("reduce-only market close did not flatten target account")
+              taker.api_client.cancel_all_orders({"market": MARKET})
+              protection_ids = []
           finally:
-              for client in (maker, taker):
+              try:
+                  maker.api_client.cancel_all_orders({"market": MARKET})
+              except Exception as exc:
+                  cleanup_errors.append("MAKER_CANCEL_" + type(exc).__name__)
+
+              remaining = pos(taker)
+              if remaining > 0:
+                  for attempt in range(3):
+                      try:
+                          submit(taker, Order(
+                              market=MARKET,
+                              order_type=OrderType.Market,
+                              order_side=OrderSide.Sell,
+                              size=remaining,
+                              client_id="p04_emergency_" + secrets.token_hex(6),
+                              instruction="IOC",
+                              reduce_only=True,
+                          ))
+                      except Exception:
+                          pass
+                      _, remaining = wait_positions(lambda a, b: b == 0, timeout=10)
+                      if remaining == 0:
+                          break
+              if remaining == 0:
                   try:
-                      client.api_client.cancel_all_orders({"market": MARKET})
+                      taker.api_client.cancel_all_orders({"market": MARKET})
                   except Exception as exc:
-                      cleanup_errors.append(type(exc).__name__)
+                      cleanup_errors.append("TAKER_CANCEL_" + type(exc).__name__)
+                  protection_ids = []
+              else:
+                  cleanup_errors.append("POSITION_NOT_FLAT_PROTECTION_LEFT_ACTIVE")
+
               final_maker, final_taker = pos(maker), pos(taker)
+              reduce_only_close_verified = final_maker == 0 and final_taker == 0
 
           result = {
               "environment": "PARADEX_NIGHTLY_SANDBOX",
               "market": MARKET,
               "size": str(SIZE),
-              "two_account_self_match": True,
+              "external_sandbox_liquidity_fill": True,
               "entry_filled": entry_filled,
               "native_stop_loss_verified": protection_verified,
               "native_take_profit_verified": protection_verified,
