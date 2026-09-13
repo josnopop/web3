@@ -1,0 +1,109 @@
+name: Paradex P01 Read-Only Probe
+
+on:
+  push:
+    branches: [paradex-p01-probe]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  p01:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install websocket client only
+        run: python -m pip install --disable-pip-version-check "websockets==15.0.1"
+      - name: Verify Paradex Testnet REST and public WebSocket
+        shell: bash
+        run: |
+          python - <<'PY'
+          import asyncio, json, statistics, time, urllib.request
+          import websockets
+
+          BASE = "https://api.testnet.paradex.trade/v1"
+          WS = "wss://ws-public.api.testnet.paradex.trade/v1"
+          MARKETS = ("BTC-USD-PERP", "ETH-USD-PERP", "SOL-USD-PERP")
+
+          def get(path):
+              start = time.monotonic()
+              req = urllib.request.Request(BASE + path, headers={"Accept": "application/json", "User-Agent": "paradex-p01/1"})
+              with urllib.request.urlopen(req, timeout=10) as response:
+                  if response.geturl() != BASE + path:
+                      raise RuntimeError("redirect refused")
+                  value = json.loads(response.read(8_000_000))
+              return value, (time.monotonic() - start) * 1000
+
+          markets, _ = get("/markets")
+          symbols = {row.get("symbol") for row in markets.get("results", [])}
+          missing = set(MARKETS) - symbols
+          if missing:
+              raise RuntimeError("missing required markets: " + ",".join(sorted(missing)))
+
+          async def websocket_probe():
+              counts = {market: 0 for market in MARKETS}
+              async with websockets.connect(WS, open_timeout=10, ping_interval=20, ping_timeout=10, max_size=8_000_000) as ws:
+                  for index, market in enumerate(MARKETS, 1):
+                      await ws.send(json.dumps({"jsonrpc":"2.0","method":"subscribe","params":{"channel":f"bbo.{market}"},"id":str(index)}))
+                  deadline = time.monotonic() + 60
+                  while time.monotonic() < deadline and not all(counts.values()):
+                      message = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
+                      text = json.dumps(message)
+                      for market in MARKETS:
+                          if market in text:
+                              counts[market] += 1
+              if not all(counts.values()):
+                  raise RuntimeError("websocket missing market messages: " + json.dumps(counts, sort_keys=True))
+              return counts
+
+          ws_counts = asyncio.run(websocket_probe())
+          latencies = []
+          successes = 0
+          failures = 0
+          max_consecutive_failures = 0
+          consecutive_failures = 0
+          samples = 60
+          for sample in range(samples):
+              try:
+                  server, latency = get("/system/time")
+                  if int(server.get("server_time", 0)) <= 0:
+                      raise RuntimeError("invalid server time")
+                  latencies.append(latency)
+                  for market in MARKETS:
+                      bbo, latency = get("/bbo/" + market)
+                      bid = float(bbo.get("bid", 0))
+                      ask = float(bbo.get("ask", 0))
+                      if bid <= 0 or ask < bid:
+                          raise RuntimeError("invalid bbo for " + market)
+                      latencies.append(latency)
+                  successes += 1
+                  consecutive_failures = 0
+              except Exception as error:
+                  failures += 1
+                  consecutive_failures += 1
+                  max_consecutive_failures = max(max_consecutive_failures, consecutive_failures)
+                  print(json.dumps({"sample":sample + 1,"ok":False,"error_type":type(error).__name__}))
+              if sample + 1 < samples:
+                  time.sleep(30)
+
+          ordered = sorted(latencies)
+          p95 = ordered[max(0, int(len(ordered) * .95) - 1)] if ordered else None
+          result = {
+              "environment": "PARADEX_TESTNET",
+              "write_attempted": False,
+              "samples": samples,
+              "successes": successes,
+              "failures": failures,
+              "max_consecutive_failures": max_consecutive_failures,
+              "rest_p50_ms": round(statistics.median(latencies), 2) if latencies else None,
+              "rest_p95_ms": round(p95, 2) if p95 is not None else None,
+              "ws_messages": ws_counts,
+          }
+          print("P01_RESULT=" + json.dumps(result, sort_keys=True))
+          if successes / samples < .99 or max_consecutive_failures > 1:
+              raise SystemExit("P01 acceptance threshold not met")
+          PY
