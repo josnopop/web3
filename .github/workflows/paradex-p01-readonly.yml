@@ -51,16 +51,32 @@ jobs:
 
           async def websocket_probe():
               counts = {market: 0 for market in MARKETS}
-              async with websockets.connect(WS, open_timeout=10, ping_interval=20, ping_timeout=10, max_size=8_000_000) as ws:
+              seen = []
+              async with websockets.connect(
+                  WS,
+                  additional_headers={"User-Agent": "paradex-p01/1"},
+                  open_timeout=15,
+                  ping_interval=20,
+                  ping_timeout=10,
+                  max_size=8_000_000,
+              ) as ws:
                   for index, market in enumerate(MARKETS, 1):
-                      await ws.send(json.dumps({"jsonrpc":"2.0","method":"subscribe","params":{"channel":f"bbo.{market}"},"id":str(index)}))
+                      await ws.send(json.dumps({"jsonrpc":"2.0","method":"subscribe","params":{"channel":f"bbo.{market}"},"id":index}))
                   deadline = time.monotonic() + 60
                   while time.monotonic() < deadline and not all(counts.values()):
-                      message = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
-                      text = json.dumps(message)
+                      remaining = max(0.1, deadline - time.monotonic())
+                      try:
+                          message = json.loads(await asyncio.wait_for(ws.recv(), timeout=min(10, remaining)))
+                      except asyncio.TimeoutError:
+                          continue
+                      params = message.get("params") or {}
+                      channel = str(params.get("channel") or "")
+                      if len(seen) < 10:
+                          seen.append({"id": message.get("id"), "method": message.get("method"), "channel": channel, "has_result": "result" in message, "has_error": "error" in message})
                       for market in MARKETS:
-                          if market in text:
+                          if channel == f"bbo.{market}":
                               counts[market] += 1
+              print("P01_WS_DISCOVERY=" + json.dumps({"counts": counts, "frames": seen}, sort_keys=True))
               if not all(counts.values()):
                   raise RuntimeError("websocket missing market messages: " + json.dumps(counts, sort_keys=True))
               return counts
