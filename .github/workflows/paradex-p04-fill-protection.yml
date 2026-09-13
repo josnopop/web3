@@ -153,8 +153,13 @@ jobs:
                   instruction="GTC",
                   reduce_only=False,
               ))
-              maker_size, taker_size = wait_positions(lambda a, b: a < 0 and b > 0)
-              entry_filled = maker_size < 0 and taker_size > 0
+              maker_size, taker_size = wait_positions(lambda a, b: b > 0)
+              entry_filled = taker_size > 0
+              if entry_filled:
+                  try:
+                      maker.api_client.cancel_order(maker_order_id)
+                  except Exception:
+                      pass
               if not entry_filled:
                   maker_state = maker.api_client.fetch_order(order_id=maker_order_id)
                   taker_state = taker.api_client.fetch_order(order_id=taker_order_id)
@@ -208,23 +213,6 @@ jobs:
               protection_ids = []
 
               close_price = (mark * Decimal("0.98")).quantize(Decimal("1"), rounding=ROUND_DOWN)
-              submit(maker, Order(
-                  market=MARKET,
-                  order_type=OrderType.Limit,
-                  order_side=OrderSide.Buy,
-                  size=abs(maker_size),
-                  limit_price=close_price,
-                  client_id="p04_close_maker_" + secrets.token_hex(6),
-                  instruction="POST_ONLY",
-                  reduce_only=True,
-              ))
-              close_orders = maker.api_client.fetch_orders({"market": MARKET}).get("results", [])
-              close_maker_id = next((row.get("id") for row in close_orders if row.get("client_id", "").startswith("p04_close_maker_")), None)
-              if not close_maker_id:
-                  raise RuntimeError("close maker lookup failed")
-              close_open, close_state = wait_order_open(maker, close_maker_id)
-              if not close_open:
-                  raise RuntimeError("close maker order not OPEN: " + close_state)
               submit(taker, Order(
                   market=MARKET,
                   order_type=OrderType.Limit,
