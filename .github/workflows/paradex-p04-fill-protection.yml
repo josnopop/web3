@@ -128,7 +128,7 @@ jobs:
 
           try:
               mark = mark_price()
-              entry_price = (mark * Decimal("1.02")).quantize(Decimal("1"), rounding=ROUND_DOWN)
+              entry_price = (mark * Decimal("0.99")).quantize(Decimal("1"), rounding=ROUND_DOWN)
 
               maker_order_id = submit(maker, Order(
                   market=MARKET,
@@ -143,6 +143,7 @@ jobs:
               maker_open, maker_state = wait_order_open(maker, maker_order_id)
               if not maker_open:
                   raise RuntimeError("entry maker order not OPEN: " + maker_state)
+
               taker_order_id = submit(taker, Order(
                   market=MARKET,
                   order_type=OrderType.Limit,
@@ -153,30 +154,23 @@ jobs:
                   instruction="GTC",
                   reduce_only=False,
               ))
-              maker_size, taker_size = wait_positions(lambda a, b: b > 0)
-              entry_filled = taker_size > 0
-              if entry_filled:
-                  try:
-                      maker.api_client.cancel_order(maker_order_id)
-                  except Exception:
-                      pass
+              maker_size, taker_size = wait_positions(lambda a, b: a < 0 and b > 0)
+              entry_filled = maker_size < 0 and taker_size > 0
               if not entry_filled:
                   maker_state = maker.api_client.fetch_order(order_id=maker_order_id)
                   taker_state = taker.api_client.fetch_order(order_id=taker_order_id)
-                  maker_fills = maker.api_client.fetch_fills({"market": MARKET}).get("results", [])
-                  taker_fills = taker.api_client.fetch_fills({"market": MARKET}).get("results", [])
                   diagnostic = {
                       "maker_status": maker_state.get("status"),
-                      "maker_cancel_reason": maker_state.get("cancel_reason"),
                       "maker_remaining_size": maker_state.get("remaining_size"),
                       "taker_status": taker_state.get("status"),
-                      "taker_cancel_reason": taker_state.get("cancel_reason"),
                       "taker_remaining_size": taker_state.get("remaining_size"),
-                      "maker_fills": len(maker_fills),
-                      "taker_fills": len(taker_fills),
+                      "maker_position": str(maker_size),
+                      "taker_position": str(taker_size),
+                      "maker_fills": len(maker.api_client.fetch_fills({"market": MARKET}).get("results", [])),
+                      "taker_fills": len(taker.api_client.fetch_fills({"market": MARKET}).get("results", [])),
                   }
                   print("P04_MATCH_DIAGNOSTIC=" + json.dumps(diagnostic, sort_keys=True), flush=True)
-                  raise RuntimeError("two-account entry did not fill")
+                  raise RuntimeError("paired entry did not create opposite positions")
 
               stop_id = submit(taker, Order(
                   market=MARKET,
@@ -208,50 +202,102 @@ jobs:
               if not protection_verified:
                   raise RuntimeError("native protection verification failed")
 
-              submit(taker, Order(
+              close_price = (mark * Decimal("0.98")).quantize(Decimal("1"), rounding=ROUND_DOWN)
+              close_maker_id = submit(maker, Order(
                   market=MARKET,
-                  order_type=OrderType.Market,
-                  order_side=OrderSide.Sell,
-                  size=taker_size,
-                  client_id="p04_close_taker_" + secrets.token_hex(6),
-                  instruction="IOC",
+                  order_type=OrderType.Limit,
+                  order_side=OrderSide.Buy,
+                  size=abs(maker_size),
+                  limit_price=close_price,
+                  client_id="p04_close_maker_" + secrets.token_hex(6),
+                  instruction="POST_ONLY",
                   reduce_only=True,
               ))
+              close_open, close_state = wait_order_open(maker, close_maker_id)
+              if not close_open:
+                  raise RuntimeError("reduce-only close maker not OPEN: " + close_state)
+
+              submit(taker, Order(
+                  market=MARKET,
+                  order_type=OrderType.Limit,
+                  order_side=OrderSide.Sell,
+                  size=taker_size,
+                  limit_price=close_price,
+                  client_id="p04_close_taker_" + secrets.token_hex(6),
+                  instruction="GTC",
+                  reduce_only=True,
+              ))
+              final_maker, final_taker = wait_positions(lambda a, b: b == 0)
+              if final_maker < 0:
+                  submit(maker, Order(
+                      market=MARKET,
+                      order_type=OrderType.Market,
+                      order_side=OrderSide.Buy,
+                      size=abs(final_maker),
+                      client_id="p04_close_maker_market_" + secrets.token_hex(6),
+                      instruction="IOC",
+                      reduce_only=True,
+                  ))
               final_maker, final_taker = wait_positions(lambda a, b: a == 0 and b == 0)
               reduce_only_close_verified = final_maker == 0 and final_taker == 0
               if not reduce_only_close_verified:
-                  raise RuntimeError("reduce-only market close did not flatten target account")
+                  raise RuntimeError("paired reduce-only close did not flatten both accounts")
+
               taker.api_client.cancel_all_orders({"market": MARKET})
+              maker.api_client.cancel_all_orders({"market": MARKET})
               protection_ids = []
           finally:
-              try:
-                  maker.api_client.cancel_all_orders({"market": MARKET})
-              except Exception as exc:
-                  cleanup_errors.append("MAKER_CANCEL_" + type(exc).__name__)
+              final_maker, final_taker = pos(maker), pos(taker)
 
-              remaining = pos(taker)
-              if remaining > 0:
-                  for attempt in range(3):
-                      try:
-                          submit(taker, Order(
-                              market=MARKET,
-                              order_type=OrderType.Market,
-                              order_side=OrderSide.Sell,
-                              size=remaining,
-                              client_id="p04_emergency_" + secrets.token_hex(6),
-                              instruction="IOC",
-                              reduce_only=True,
-                          ))
-                      except Exception:
-                          pass
-                      _, remaining = wait_positions(lambda a, b: b == 0, timeout=10)
-                      if remaining == 0:
-                          break
-              if remaining == 0:
+              if final_maker < 0 and final_taker > 0 and abs(final_maker) == final_taker:
                   try:
-                      taker.api_client.cancel_all_orders({"market": MARKET})
-                  except Exception as exc:
-                      cleanup_errors.append("TAKER_CANCEL_" + type(exc).__name__)
+                      cleanup_price = (mark_price() * Decimal("0.97")).quantize(Decimal("1"), rounding=ROUND_DOWN)
+                      cleanup_maker_id = submit(maker, Order(
+                          market=MARKET,
+                          order_type=OrderType.Limit,
+                          order_side=OrderSide.Buy,
+                          size=abs(final_maker),
+                          limit_price=cleanup_price,
+                          client_id="p04_cleanup_maker_" + secrets.token_hex(6),
+                          instruction="POST_ONLY",
+                          reduce_only=True,
+                      ))
+                      wait_order_open(maker, cleanup_maker_id)
+                      submit(taker, Order(
+                          market=MARKET,
+                          order_type=OrderType.Limit,
+                          order_side=OrderSide.Sell,
+                          size=final_taker,
+                          limit_price=cleanup_price,
+                          client_id="p04_cleanup_taker_" + secrets.token_hex(6),
+                          instruction="GTC",
+                          reduce_only=True,
+                      ))
+                      final_maker, final_taker = wait_positions(lambda a, b: a == 0 and b == 0, timeout=30)
+                  except Exception:
+                      pass
+
+              if final_maker < 0:
+                  try:
+                      submit(maker, Order(
+                          market=MARKET,
+                          order_type=OrderType.Market,
+                          order_side=OrderSide.Buy,
+                          size=abs(final_maker),
+                          client_id="p04_emergency_maker_" + secrets.token_hex(6),
+                          instruction="IOC",
+                          reduce_only=True,
+                      ))
+                      final_maker, final_taker = wait_positions(lambda a, b: a == 0, timeout=20)
+                  except Exception:
+                      pass
+
+              if final_maker == 0 and final_taker == 0:
+                  for label, client in (("MAKER", maker), ("TAKER", taker)):
+                      try:
+                          client.api_client.cancel_all_orders({"market": MARKET})
+                      except Exception as exc:
+                          cleanup_errors.append(label + "_CANCEL_" + type(exc).__name__)
                   protection_ids = []
               else:
                   cleanup_errors.append("POSITION_NOT_FLAT_PROTECTION_LEFT_ACTIVE")
@@ -263,7 +309,7 @@ jobs:
               "environment": "PARADEX_NIGHTLY_SANDBOX",
               "market": MARKET,
               "size": str(SIZE),
-              "external_sandbox_liquidity_fill": True,
+              "paired_sandbox_accounts": True,
               "entry_filled": entry_filled,
               "native_stop_loss_verified": protection_verified,
               "native_take_profit_verified": protection_verified,
