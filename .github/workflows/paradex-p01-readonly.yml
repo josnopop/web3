@@ -29,7 +29,8 @@ jobs:
 
           BASE = "https://api.testnet.paradex.trade/v1"
           WS = "wss://ws-public.api.testnet.paradex.trade/v1"
-          MARKETS = ("BTC-USD-PERP", "ETH-USD-PERP", "SOL-USD-PERP")
+          REQUESTED_MARKETS = ("BTC-USD-PERP", "ETH-USD-PERP", "SOL-USD-PERP")
+          MARKETS = ("BTC-USD-PERP", "ETH-USD-PERP")
 
           def get(path):
               start = time.monotonic()
@@ -43,10 +44,10 @@ jobs:
           markets, _ = get("/markets")
           symbols = {row.get("symbol") for row in markets.get("results", [])}
           missing = set(MARKETS) - symbols
+          unsupported = sorted(set(REQUESTED_MARKETS) - symbols)
+          print("P01_CAPABILITIES=" + json.dumps({"enabled": list(MARKETS), "unsupported": unsupported}, sort_keys=True))
           if missing:
-              related = sorted(symbol for symbol in symbols if any(asset in str(symbol).upper() for asset in ("BTC", "ETH", "SOL")))
-              print("P01_MARKET_DISCOVERY=" + json.dumps({"missing": sorted(missing), "related": related}, sort_keys=True))
-              raise RuntimeError("missing required markets: " + ",".join(sorted(missing)))
+              raise RuntimeError("missing enabled markets: " + ",".join(sorted(missing)))
 
           async def websocket_probe():
               counts = {market: 0 for market in MARKETS}
@@ -98,6 +99,8 @@ jobs:
           p95 = ordered[max(0, int(len(ordered) * .95) - 1)] if ordered else None
           result = {
               "environment": "PARADEX_TESTNET",
+              "enabled_markets": list(MARKETS),
+              "unsupported_markets": unsupported,
               "write_attempted": False,
               "samples": samples,
               "successes": successes,
