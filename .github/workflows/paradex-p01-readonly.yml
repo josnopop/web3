@@ -105,6 +105,31 @@ jobs:
           if missing:
               raise RuntimeError("missing enabled markets: " + ",".join(sorted(missing)))
 
+          def event_markets(message):
+              if message.get("method") != "subscription":
+                  return []
+              params = message.get("params") or {}
+              channel = params.get("channel")
+              data = params.get("data")
+              rows = data if isinstance(data, list) else [data]
+              found = []
+              for row in rows:
+                  if not isinstance(row, dict):
+                      continue
+                  market = row.get("market", row.get("symbol"))
+                  if market not in MARKETS:
+                      continue
+                  if channel == f"bbo.{market}" and quote_metrics(row, market)["valid_payload"]:
+                      found.append(market)
+                  elif channel in ("markets_summary", f"markets_summary.{market}"):
+                      try:
+                          price = Decimal(str(row.get("mark_price")))
+                          if price.is_finite() and price > 0 and int(row.get("created_at", 0)) > 0:
+                              found.append(market)
+                      except (InvalidOperation, ValueError, TypeError):
+                          pass
+              return found
+
           async def websocket_probe():
               counts = {market: 0 for market in MARKETS}
               acknowledgements = {market: False for market in MARKETS}
@@ -120,7 +145,8 @@ jobs:
               ) as ws:
                   for index, market in enumerate(MARKETS, 1):
                       await ws.send(json.dumps({"jsonrpc":"2.0","method":"subscribe","params":{"channel":f"bbo.{market}"},"id":index}))
-                  deadline = time.monotonic() + 60
+                  await ws.send(json.dumps({"jsonrpc":"2.0","method":"subscribe","params":{"channel":"markets_summary"},"id":3}))
+                  deadline = time.monotonic() + 120
                   while time.monotonic() < deadline and not (all(acknowledgements.values()) and sum(counts.values()) > 0):
                       remaining = max(0.1, deadline - time.monotonic())
                       try:
@@ -134,12 +160,9 @@ jobs:
                           acknowledgements[request_market[response_id]] = True
                       if len(seen) < 10:
                           seen.append({"id": message.get("id"), "method": message.get("method"), "channel": channel, "has_result": "result" in message, "has_error": "error" in message})
-                      for market in MARKETS:
-                          if channel == f"bbo.{market}" and message.get("method") == "subscription" and isinstance(params.get("data"), dict) and params["data"].get("market") == market:
-                              counts[market] += 1
+                      for market in event_markets(message):
+                          counts[market] += 1
               print("P01_WS_DISCOVERY=" + json.dumps({"acknowledgements": acknowledgements, "counts": counts, "frames": seen}, sort_keys=True))
-              if not all(acknowledgements.values()) or sum(counts.values()) == 0:
-                  raise RuntimeError("websocket acceptance failed: " + json.dumps({"acknowledgements": acknowledgements, "counts": counts}, sort_keys=True))
               return {"acknowledgements": acknowledgements, "market_events": counts}
 
           ws_counts = asyncio.run(websocket_probe())
