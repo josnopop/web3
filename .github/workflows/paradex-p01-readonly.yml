@@ -1,0 +1,213 @@
+name: Paradex P01 Read-Only Probe
+
+on:
+  push:
+    branches: [paradex-p01-probe]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  p01:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install websocket client only
+        run: python -m pip install --disable-pip-version-check "websockets==15.0.1"
+      - name: Verify Paradex Testnet REST and public WebSocket
+        shell: bash
+        run: |
+          python - <<'PY'
+          import asyncio, json, statistics, time, urllib.request
+          from decimal import Decimal, InvalidOperation
+          import websockets
+
+          BASE = "https://api.testnet.paradex.trade/v1"
+          WS = "wss://ws-public.api.testnet.paradex.trade/v1"
+          REQUESTED_MARKETS = ("BTC-USD-PERP", "ETH-USD-PERP", "SOL-USD-PERP")
+          MARKETS = ("BTC-USD-PERP", "ETH-USD-PERP")
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+
+          def quote_metrics(bbo, market):
+              valid = isinstance(bbo, dict) and bbo.get("market") == market
+              prices = []
+              for current, legacy in (("bid_price", "bid"), ("ask_price", "ask")):
+                  value = bbo.get(current, bbo.get(legacy)) if isinstance(bbo, dict) else None
+                  if value in (None, ""):
+                      prices.append(None)
+                      continue
+                  try:
+                      price = Decimal(str(value))
+                      if not price.is_finite() or price < 0:
+                          valid = False
+                          price = None
+                  except (InvalidOperation, ValueError):
+                      valid = False
+                      price = None
+                  prices.append(price)
+              bid, ask = prices
+              two_sided = bool(valid and bid is not None and ask is not None and 0 < bid <= ask)
+              return {"valid_payload": valid, "two_sided_quote": two_sided}
+
+          def rest_sample():
+              endpoints = {}
+              latencies = []
+              for path in ("/system/time", "/markets", *("/bbo/" + m for m in MARKETS)):
+                  row = {"request_success": False, "valid_payload": False}
+                  try:
+                      value, latency = get(path)
+                      latencies.append(latency)
+                      row["request_success"] = True
+                      if path == "/system/time":
+                          stamp = value.get("server_time")
+                          row["valid_payload"] = not isinstance(stamp, bool) and Decimal(str(stamp)).is_finite() and Decimal(str(stamp)) > 0
+                      elif path == "/markets":
+                          symbols = {m.get("symbol") for m in value.get("results", []) if isinstance(m, dict)}
+                          row["valid_payload"] = set(MARKETS) <= symbols
+                      else:
+                          row.update(quote_metrics(value, path.rsplit("/", 1)[1]))
+                  except Exception as error:
+                      row["error_type"] = type(error).__name__
+                  endpoints[path] = row
+              return {"request_success": all(r["request_success"] for r in endpoints.values()),
+                      "valid_payload": all(r["valid_payload"] for r in endpoints.values()),
+                      "endpoints": endpoints, "latencies_ms": latencies}
+
+          def acceptance(successes, samples, max_failures, acknowledgements, events):
+              return samples == 60 and successes / samples >= .99 and max_failures <= 1 and all(
+                  acknowledgements.get(m) is True for m in MARKETS) and sum(events.get(m, 0) for m in MARKETS) > 0
+
+          def get(path):
+              start = time.monotonic()
+              req = urllib.request.Request(BASE + path, headers={"Accept": "application/json", "User-Agent": "paradex-p01/1"})
+              with urllib.request.build_opener(NoRedirect).open(req, timeout=10) as response:
+                  if response.geturl() != BASE + path:
+                      raise RuntimeError("redirect refused")
+                  value = json.loads(response.read(8_000_000))
+              if not isinstance(value, dict):
+                  raise ValueError("JSON object required")
+              return value, (time.monotonic() - start) * 1000
+
+          markets, _ = get("/markets")
+          symbols = {row.get("symbol") for row in markets.get("results", [])}
+          missing = set(MARKETS) - symbols
+          unsupported = sorted(set(REQUESTED_MARKETS) - symbols)
+          print("P01_CAPABILITIES=" + json.dumps({"enabled": list(MARKETS), "unsupported": unsupported}, sort_keys=True))
+          if missing:
+              raise RuntimeError("missing enabled markets: " + ",".join(sorted(missing)))
+
+          def event_markets(message):
+              if message.get("method") != "subscription":
+                  return []
+              params = message.get("params") or {}
+              channel = params.get("channel")
+              data = params.get("data")
+              rows = data if isinstance(data, list) else [data]
+              found = []
+              for row in rows:
+                  if not isinstance(row, dict):
+                      continue
+                  market = row.get("market", row.get("symbol"))
+                  if market not in MARKETS:
+                      continue
+                  if channel == f"bbo.{market}" and quote_metrics(row, market)["valid_payload"]:
+                      found.append(market)
+                  elif channel in ("markets_summary", f"markets_summary.{market}"):
+                      try:
+                          price = Decimal(str(row.get("mark_price")))
+                          if price.is_finite() and price > 0 and int(row.get("created_at", 0)) > 0:
+                              found.append(market)
+                      except (InvalidOperation, ValueError, TypeError):
+                          pass
+              return found
+
+          async def websocket_probe():
+              counts = {market: 0 for market in MARKETS}
+              acknowledgements = {market: False for market in MARKETS}
+              request_market = {index: market for index, market in enumerate(MARKETS, 1)}
+              seen = []
+              async with websockets.connect(
+                  WS,
+                  additional_headers={"User-Agent": "paradex-p01/1"},
+                  open_timeout=15,
+                  ping_interval=20,
+                  ping_timeout=10,
+                  max_size=8_000_000,
+              ) as ws:
+                  for index, market in enumerate(MARKETS, 1):
+                      await ws.send(json.dumps({"jsonrpc":"2.0","method":"subscribe","params":{"channel":f"bbo.{market}"},"id":index}))
+                  await ws.send(json.dumps({"jsonrpc":"2.0","method":"subscribe","params":{"channel":"markets_summary"},"id":3}))
+                  deadline = time.monotonic() + 120
+                  while time.monotonic() < deadline and not (all(acknowledgements.values()) and sum(counts.values()) > 0):
+                      remaining = max(0.1, deadline - time.monotonic())
+                      try:
+                          message = json.loads(await asyncio.wait_for(ws.recv(), timeout=min(10, remaining)))
+                      except asyncio.TimeoutError:
+                          continue
+                      params = message.get("params") or {}
+                      channel = str(params.get("channel") or "")
+                      response_id = message.get("id")
+                      if response_id in request_market and "result" in message and "error" not in message:
+                          acknowledgements[request_market[response_id]] = True
+                      if len(seen) < 10:
+                          seen.append({"id": message.get("id"), "method": message.get("method"), "channel": channel, "has_result": "result" in message, "has_error": "error" in message})
+                      for market in event_markets(message):
+                          counts[market] += 1
+              print("P01_WS_DISCOVERY=" + json.dumps({"acknowledgements": acknowledgements, "counts": counts, "frames": seen}, sort_keys=True))
+              return {"acknowledgements": acknowledgements, "market_events": counts}
+
+          ws_counts = asyncio.run(websocket_probe())
+          latencies = []
+          successes = valid_payloads = 0
+          max_consecutive_failures = consecutive_failures = 0
+          two_sided = {market: 0 for market in MARKETS}
+          endpoint_success = {path: 0 for path in ("/system/time", "/markets", *("/bbo/" + m for m in MARKETS))}
+          samples = 60
+          for sample in range(samples):
+              row = rest_sample()
+              latencies.extend(row.pop("latencies_ms"))
+              successes += int(row["request_success"])
+              valid_payloads += int(row["valid_payload"])
+              consecutive_failures = 0 if row["request_success"] else consecutive_failures + 1
+              max_consecutive_failures = max(max_consecutive_failures, consecutive_failures)
+              for path, endpoint in row["endpoints"].items():
+                  endpoint_success[path] += int(endpoint["request_success"])
+              for market in MARKETS:
+                  two_sided[market] += int(row["endpoints"]["/bbo/" + market].get("two_sided_quote", False))
+              print("P01_SAMPLE=" + json.dumps({"sample": sample + 1, "utc_ms": time.time_ns() // 1_000_000, **row}, sort_keys=True), flush=True)
+              if sample + 1 < samples:
+                  time.sleep(30)
+
+          ordered = sorted(latencies)
+          p95 = ordered[max(0, int(len(ordered) * .95) - 1)] if ordered else None
+          passed = acceptance(successes, samples, max_consecutive_failures,
+                              ws_counts["acknowledgements"], ws_counts["market_events"])
+          result = {
+              "environment": "PARADEX_TESTNET",
+              "enabled_markets": list(MARKETS),
+              "unsupported_markets": unsupported,
+              "write_attempted": False,
+              "samples": samples,
+              "request_success": {"count": successes, "rate": successes / samples},
+              "valid_payload": {"count": valid_payloads, "rate": valid_payloads / samples},
+              "two_sided_quote": {m: {"count": n, "rate": n / samples} for m, n in two_sided.items()},
+              "endpoint_success": endpoint_success,
+              "max_consecutive_failures": max_consecutive_failures,
+              "rest_p50_ms": round(statistics.median(latencies), 2) if latencies else None,
+              "rest_p95_ms": round(p95, 2) if p95 is not None else None,
+              "ws_messages": ws_counts,
+              "passed": passed,
+          }
+          print("P01_RESULT=" + json.dumps(result, sort_keys=True))
+          if not passed:
+              raise SystemExit("P01 acceptance threshold not met")
+          PY
