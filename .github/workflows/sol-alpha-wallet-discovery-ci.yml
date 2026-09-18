@@ -1,0 +1,19 @@
+name: sol-alpha-wallet-discovery-ci
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sol-alpha-wallet-discovery
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m compileall config.py scoring.py bigquery_scan.py
+      - run: python -m unittest discover -s tests -v
