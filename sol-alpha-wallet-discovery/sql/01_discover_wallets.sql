@@ -54,7 +54,7 @@ pre_bal AS (
     AND b.mint NOT IN (
       'So11111111111111111111111111111111111111112',
       'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-      'Es9vMFrzaCERmJfrF4H2FYD7D5n2Gx9QjqE6XQY8F9n'
+      'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
     )
 ),
 post_bal AS (
@@ -67,7 +67,7 @@ post_bal AS (
     AND b.mint NOT IN (
       'So11111111111111111111111111111111111111112',
       'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-      'Es9vMFrzaCERmJfrF4H2FYD7D5n2Gx9QjqE6XQY8F9n'
+      'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
     )
 ),
 token_deltas AS (
