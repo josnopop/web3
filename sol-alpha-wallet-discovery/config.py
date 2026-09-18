@@ -10,7 +10,7 @@ LOOKBACK_DAYS = 30
 # Quote assets used to infer buy/sell direction and copyable entry price.
 WSOL = "So11111111111111111111111111111111111111112"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-USDT = "Es9vMFrzaCERmJfrF4H2FYD7D5n2Gx9QjqE6XQY8F9n"
+USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 QUOTE_MINTS = {WSOL, USDC, USDT}
 
 # Initial production DEX/launch coverage. Keep this config versioned; never change it
