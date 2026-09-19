@@ -10,6 +10,10 @@ on:
       - "sol-alpha-wallet-discovery/build_wallet_history_cache.py"
   workflow_dispatch:
 
+concurrency:
+  group: s-historical-elite-v2-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     strategy:
