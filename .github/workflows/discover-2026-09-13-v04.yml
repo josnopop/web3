@@ -1,0 +1,36 @@
+name: discover-2026-09-13-v04
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/discover-2026-09-13-v04.yml"
+  workflow_dispatch:
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install requirements
+        working-directory: sol-alpha-wallet-discovery
+        run: pip install -r requirements.txt
+      - name: Discover Sep13 frozen wallets from dated evidence
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python discover_walkforward_candidates.py \
+            --cutoff-date 2026-09-13 \
+            --lookback-days 30 \
+            --token-limit 20 \
+            --buyers-per-token 15 \
+            --tx-limit 120 \
+            --curve-pages 2 \
+            --workers 4 \
+            --out out/2026-09-13/v04_candidates.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep13-v04-candidates
+          path: sol-alpha-wallet-discovery/out/2026-09-13/v04_candidates.json
+          if-no-files-found: error
