@@ -2,6 +2,11 @@ name: sol-alpha-wallet-discovery-ci
 
 on:
   pull_request:
+    paths:
+      - "sol-alpha-wallet-discovery/**/*.py"
+      - "sol-alpha-wallet-discovery/tests/**"
+      - "sol-alpha-wallet-discovery/requirements.txt"
+      - ".github/workflows/sol-alpha-wallet-discovery-ci.yml"
   workflow_dispatch:
 
 jobs:
