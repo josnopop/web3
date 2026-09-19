@@ -1,0 +1,86 @@
+name: s-7day-budget-sim-2026-09-12-18
+
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s-7day-budget-sim-2026-09-12-18.yml"
+      - "sol-alpha-wallet-discovery/s_7day_budget_sim.py"
+      - "sol-alpha-wallet-discovery/s_day_replay_fast.py"
+      - "sol-alpha-wallet-discovery/s_day_replay.py"
+      - "sol-alpha-wallet-discovery/s_simple12_2026_09_19.json"
+  workflow_dispatch:
+
+concurrency:
+  group: s-7day-budget-sim-2026-09-12-18-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Replay Sep12-Sep18 for all 12 S wallets
+        working-directory: sol-alpha-wallet-discovery
+        shell: bash
+        run: |
+          set -e
+          mkdir -p out/s_7day/replays
+          for d in 2026-09-12 2026-09-13 2026-09-14 2026-09-15 2026-09-16 2026-09-17 2026-09-18; do
+            echo "=== REPLAY $d ==="
+            mkdir -p "out/s_7day/replays/$d"
+            python s_day_replay_fast.py --pool s_simple12_2026_09_19.json --date "$d" --shard 0 --shards 4 --pages 4 --batch-size 20 --out "out/s_7day/replays/$d/shard_0.json" &
+            p0=$!
+            python s_day_replay_fast.py --pool s_simple12_2026_09_19.json --date "$d" --shard 1 --shards 4 --pages 4 --batch-size 20 --out "out/s_7day/replays/$d/shard_1.json" &
+            p1=$!
+            python s_day_replay_fast.py --pool s_simple12_2026_09_19.json --date "$d" --shard 2 --shards 4 --pages 4 --batch-size 20 --out "out/s_7day/replays/$d/shard_2.json" &
+            p2=$!
+            python s_day_replay_fast.py --pool s_simple12_2026_09_19.json --date "$d" --shard 3 --shards 4 --pages 4 --batch-size 20 --out "out/s_7day/replays/$d/shard_3.json" &
+            p3=$!
+            wait $p0 $p1 $p2 $p3
+          done
+
+      - name: Simulate 1 SOL daily budget with win-rate weighted sizing
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python s_7day_budget_sim.py \
+            --replays out/s_7day/replays \
+            --daily-budget-sol 1.0 \
+            --confirm-seconds 600 \
+            --roundtrip-friction 0.015 \
+            --out out/s_7day/S_7DAY_RESULT.json \
+            --csv out/s_7day/S_7DAY_TRADES.csv
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("out/s_7day/S_7DAY_RESULT.json").read_text())
+          print(json.dumps({
+              "period_local":d["period_local"],
+              "wallets_scanned_unique":d["wallets_scanned_unique"],
+              "decoded_trade_rows":d["decoded_trade_rows"],
+              "unique_signal_tokens":d["unique_signal_tokens"],
+              "total_positions":d["total_positions"],
+              "closed":d["closed"],
+              "open":d["open"],
+              "wins":d["wins"],
+              "losses":d["losses"],
+              "closed_win_rate":d["closed_win_rate"],
+              "total_deployed_sol":d["total_deployed_sol"],
+              "total_closed_exit_sol":d["total_closed_exit_sol"],
+              "realized_net_pnl_sol":d["realized_net_pnl_sol"],
+              "realized_return_on_total_deployed_pct":d["realized_return_on_total_deployed_pct"],
+              "open_principal_sol":d["open_principal_sol"],
+              "daily":d["daily"],
+          }, ensure_ascii=False, indent=2))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: S-7DAY-BUDGET-SIM-2026-09-12-18
+          path: sol-alpha-wallet-discovery/out/s_7day/
+          if-no-files-found: error
