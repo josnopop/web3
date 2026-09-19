@@ -1,0 +1,51 @@
+name: replay-2026-09-15-mass-alpha
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/replay-2026-09-15-mass-alpha.yml"
+  workflow_dispatch:
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build Sep14 pre-cutoff candidate list
+        working-directory: sol-alpha-wallet-discovery
+        run: python collect_alpha_candidates.py --cutoff 2026-09-14T16:00:00Z --pages 3 --limit 100 --out out/2026-09-14/alpha_candidates.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep14-alpha-candidates
+          path: sol-alpha-wallet-discovery/out/2026-09-14/alpha_candidates.json
+          if-no-files-found: error
+
+  replay:
+    needs: collect
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: sep14-alpha-candidates
+          path: input
+      - name: Replay Sep15 mainnet activity
+        working-directory: sol-alpha-wallet-discovery
+        run: python mass_replay.py --candidates ../input/alpha_candidates.json --date 2026-09-15 --shard ${{ matrix.shard }} --shards 10 --pages 3 --out out/2026-09-15/mass_alpha_${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep15-alpha-replay-${{ matrix.shard }}
+          path: sol-alpha-wallet-discovery/out/2026-09-15/mass_alpha_*.json
+          if-no-files-found: error
