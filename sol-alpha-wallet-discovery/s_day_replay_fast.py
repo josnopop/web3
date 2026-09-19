@@ -9,7 +9,7 @@ from datetime import date
 from pathlib import Path
 
 from config import utc_window_for_local_day
-from public_rpc_scan import DEFAULT_RPC, PUBLIC_RPC_POOL, iter_signatures
+from public_rpc_scan import DEFAULT_RPC, PUBLIC_RPC_POOL, iter_signatures, rpc_call
 from s_day_replay import decode_one
 
 
@@ -107,8 +107,22 @@ def main():
 
         for sig, tx, err in batch_get_transactions(sigs, args.rpc, args.batch_size):
             if err:
-                errors += 1
-                continue
+                # Public RPCs frequently reject JSON-RPC batches with 429/403.
+                # Fall back to the battle-tested single-call rotator so failed
+                # batches never become silently missing wallet history.
+                try:
+                    tx = rpc_call(
+                        "getTransaction",
+                        [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}],
+                        args.rpc,
+                        timeout=35,
+                        retries=6,
+                    )
+                    err = None
+                except Exception:
+                    errors += 1
+                    continue
+
             t = decode_one(tx, wallet, sig)
             if t:
                 t["source_win_rate"] = src.get("win_rate")
