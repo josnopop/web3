@@ -4,8 +4,10 @@ on:
     branches: [feat/wallet-discovery-v03]
     paths:
       - ".github/workflows/s-wallet-hunt-current.yml"
-      - "sol-alpha-wallet-discovery/s_wallet_filter.py"
-      - "sol-alpha-wallet-discovery/build_s_candidate_pool.py"\n      - "sol-alpha-wallet-discovery/s_fast15_filter.py"
+      - "sol-alpha-wallet-discovery/s_fast15_filter.py"
+      - "sol-alpha-wallet-discovery/build_s_candidate_pool.py"
+      - "sol-alpha-wallet-discovery/history_rescore.py"
+      - "sol-alpha-wallet-discovery/build_wallet_history_cache.py"
   workflow_dispatch:
 
 jobs:
@@ -42,7 +44,7 @@ jobs:
       matrix:
         shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -60,7 +62,7 @@ jobs:
             --start-date 2026-09-04 \
             --end-date 2026-09-19 \
             --shard ${{ matrix.shard }} --shards 16 \
-            --pages 12 \
+            --pages 10 \
             --out out/s_history/shard_${{ matrix.shard }}.json
       - uses: actions/upload-artifact@v4
         with:
@@ -82,20 +84,15 @@ jobs:
           pattern: s-history-*
           path: sol-alpha-wallet-discovery/out/s_history
           merge-multiple: true
-      - name: Score and keep S only
+      - name: 7d freshness + 15d S qualification
         working-directory: sol-alpha-wallet-discovery
         run: |
-          python score_wallet_cache.py \
+          python s_fast15_filter.py \
             --cache out/s_history \
             --cutoff-date 2026-09-19 \
-            --out out/s_hunt/scored.json
-          python s_wallet_filter.py \
-            --scores out/s_hunt/scored.json \
-            --out out/s_hunt/S_WALLETS.json
+            --out out/s_hunt/S_WALLETS_FAST15.json
       - uses: actions/upload-artifact@v4
         with:
-          name: S-WALLETS-2026-09-19
-          path: |
-            sol-alpha-wallet-discovery/out/s_hunt/scored.json
-            sol-alpha-wallet-discovery/out/s_hunt/S_WALLETS.json
+          name: S-WALLETS-FAST15-2026-09-19
+          path: sol-alpha-wallet-discovery/out/s_hunt/S_WALLETS_FAST15.json
           if-no-files-found: error
