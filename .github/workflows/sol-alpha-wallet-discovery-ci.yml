@@ -9,6 +9,10 @@ on:
       - ".github/workflows/sol-alpha-wallet-discovery-ci.yml"
   workflow_dispatch:
 
+concurrency:
+  group: sol-alpha-wallet-discovery-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
