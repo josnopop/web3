@@ -1,0 +1,39 @@
+name: decode-2026-09-16-wallet-swaps
+
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - "sol-alpha-wallet-discovery/decode_wallet_trades.py"
+      - ".github/workflows/decode-wallet-day.yml"
+  workflow_dispatch:
+
+jobs:
+  decode:
+    strategy:
+      fail-fast: false
+      max-parallel: 15
+      matrix:
+        index: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: wallet-signatures-2026-09-16-${{ matrix.index }}
+          path: input
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 35417479678
+      - name: Decode DEX swaps from official Solana RPC
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python decode_wallet_trades.py --input ../input --out out/2026-09-16/trades_${{ matrix.index }}.json --rpc https://api.mainnet-beta.solana.com --sleep 0.28
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wallet-trades-2026-09-16-${{ matrix.index }}
+          path: sol-alpha-wallet-discovery/out/2026-09-16/trades_*.json
+          if-no-files-found: error

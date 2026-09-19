@@ -1,0 +1,28 @@
+name: s16-v2-decode-hot
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s16-v2-decode-hot.yml"
+  workflow_dispatch:
+jobs:
+  replay:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [4,9]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: V2 decode
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          mkdir -p out/s16_v2
+          python s_day_replay_fast.py --pool s_simple12_2026_09_19.json --date 2026-09-16 --shard ${{ matrix.shard }} --shards 12 --pages 4 --rpc https://api.mainnet.solana.com --batch-size 20 --out out/s16_v2/shard_${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s16-v2-${{ matrix.shard }}
+          path: sol-alpha-wallet-discovery/out/s16_v2/shard_${{ matrix.shard }}.json

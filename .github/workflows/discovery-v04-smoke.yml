@@ -1,0 +1,24 @@
+name: discovery-v04-smoke
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/discovery-v04-smoke.yml"
+  workflow_dispatch:
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Broad wallet discovery smoke test
+        working-directory: sol-alpha-wallet-discovery
+        run: python collect_alpha_candidates.py --cutoff 2026-09-13T16:00:00Z --historical-mode broad_discovery --pages 5 --limit 100 --out out/v04/sep13_candidates.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: discovery-v04-sep13
+          path: sol-alpha-wallet-discovery/out/v04/sep13_candidates.json
+          if-no-files-found: error

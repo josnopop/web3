@@ -1,0 +1,37 @@
+name: s16-rpc-crosscheck
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s16-rpc-crosscheck.yml"
+      - "sol-alpha-wallet-discovery/s16_rpc_crosscheck.py"
+  workflow_dispatch:
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        include:
+          - {name: S1, wallet: "8TawwodB8Mkk1YnqJjEau5Cerix4wms61Yw1gTAc6n49"}
+          - {name: S3, wallet: "2NoNSAa4F9Srj3M6myFtKTk9VWrYqyHBMbCwwepfYmwi"}
+          - {name: S5, wallet: "4YrqTrUJ7JMNTPvRJeRN3TGxQ4KiPz7tom83XJN6aUa1"}
+          - {name: S6, wallet: "wae8YMC7PWjcPbM3mdx3CUDZEkkjaFAE4VxS5mF2YuN"}
+          - {name: S10, wallet: "2ksQ77e9e5SS6VA6poanRGWfkU3R4R5wZnptbJHb2nx9"}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Cross-check independent RPC signature history
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          mkdir -p out/s16_cross
+          python s16_rpc_crosscheck.py --wallet "${{ matrix.wallet }}" --pages 4 --out "out/s16_cross/${{ matrix.name }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s16-cross-${{ matrix.name }}
+          path: sol-alpha-wallet-discovery/out/s16_cross/${{ matrix.name }}.json
+          if-no-files-found: error

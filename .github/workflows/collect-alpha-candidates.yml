@@ -1,0 +1,25 @@
+name: collect-2026-09-15-alpha-candidates
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - "sol-alpha-wallet-discovery/collect_alpha_candidates.py"
+      - ".github/workflows/collect-alpha-candidates.yml"
+  workflow_dispatch:
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Collect strictly pre-cutoff anonymous alpha wallets
+        working-directory: sol-alpha-wallet-discovery
+        run: python collect_alpha_candidates.py --cutoff 2026-09-15T16:00:00Z --pages 3 --limit 100
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alpha-candidates-2026-09-15
+          path: sol-alpha-wallet-discovery/out/2026-09-15/alpha_candidates.json
+          if-no-files-found: error

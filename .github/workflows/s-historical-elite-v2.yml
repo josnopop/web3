@@ -1,0 +1,18 @@
+name: s-historical-elite-v2
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s-historical-elite-v2.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: s-historical-elite-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  retired:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "retired; current priority is 24h S-wallet simulation"

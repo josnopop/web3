@@ -1,0 +1,59 @@
+name: strict-sep15-to-sep16-walkforward
+
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - "sol-alpha-wallet-discovery/build_strict_pool.py"
+      - ".github/workflows/strict-sep15-to-sep16.yml"
+  workflow_dispatch:
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Harvest 30d strictly dated historical evidence
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python harvest_madeonsol_history.py --start 2026-08-17 --end 2026-09-15 --out out/2026-09-15/madeonsol_history_30d.json
+          python build_strict_pool.py --history out/2026-09-15/madeonsol_history_30d.json --out out/2026-09-15/strict_frozen_pool.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: strict-frozen-pool-2026-09-15
+          path: |
+            sol-alpha-wallet-discovery/out/2026-09-15/madeonsol_history_30d.json
+            sol-alpha-wallet-discovery/out/2026-09-15/strict_frozen_pool.json
+          if-no-files-found: error
+
+  replay:
+    needs: freeze
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: strict-frozen-pool-2026-09-15
+          path: input
+      - name: Replay frozen wallets on Sep16 mainnet
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python mass_replay.py --candidates ../input/strict_frozen_pool.json --date 2026-09-16 --shard ${{ matrix.shard }} --shards 8 --pages 10 --out out/2026-09-16/strict_replay_${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: strict-replay-${{ matrix.shard }}
+          path: sol-alpha-wallet-discovery/out/2026-09-16/strict_replay_*.json
+          if-no-files-found: error

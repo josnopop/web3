@@ -1,0 +1,102 @@
+name: s-wallet-hunt-current
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s-wallet-hunt-current.yml"
+      - "sol-alpha-wallet-discovery/s_fast7_filter.py"
+      - "sol-alpha-wallet-discovery/build_s_candidate_pool.py"
+      - "sol-alpha-wallet-discovery/history_rescore.py"
+      - "sol-alpha-wallet-discovery/build_wallet_history_cache.py"
+  workflow_dispatch:
+
+concurrency:
+  group: s-wallet-hunt-current-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Broad current wallet discovery
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python collect_alpha_candidates.py \
+            --cutoff 2026-09-18T16:00:00Z \
+            --historical-mode broad_discovery \
+            --pages 5 --limit 100 \
+            --out out/s_hunt/broad.json
+          python build_s_candidate_pool.py \
+            --input out/s_hunt/broad.json \
+            --limit 80 \
+            --out out/s_hunt/s_candidates.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s-wallet-candidates
+          path: sol-alpha-wallet-discovery/out/s_hunt/s_candidates.json
+          if-no-files-found: error
+
+  validate:
+    needs: discover
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: s-wallet-candidates
+          path: sol-alpha-wallet-discovery/out/s_hunt
+      - name: Build 7d chain history cache
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python build_wallet_history_cache.py \
+            --candidates out/s_hunt/s_candidates.json \
+            --start-date 2026-09-12 \
+            --end-date 2026-09-19 \
+            --shard ${{ matrix.shard }} --shards 16 \
+            --pages 8 \
+            --out out/s_history/shard_${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s-history-${{ matrix.shard }}
+          path: sol-alpha-wallet-discovery/out/s_history/shard_${{ matrix.shard }}.json
+          if-no-files-found: error
+
+  qualify:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: s-history-*
+          path: sol-alpha-wallet-discovery/out/s_history
+          merge-multiple: true
+      - name: 7d freshness + 7d S qualification
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python s_fast7_filter.py \
+            --cache out/s_history \
+            --cutoff-date 2026-09-19 \
+            --out out/s_hunt/S_WALLETS_FAST7.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: S-WALLETS-FAST7-2026-09-19
+          path: sol-alpha-wallet-discovery/out/s_hunt/S_WALLETS_FAST7.json
+          if-no-files-found: error

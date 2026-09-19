@@ -1,0 +1,28 @@
+name: s18-top5-rotation-replay
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths: [".github/workflows/s18-top5-rotation-replay.yml"]
+jobs:
+  replay:
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        shard: [0,1,2,3,4]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: Replay Sep18
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          mkdir -p out/s18_top5
+          python s_quote_replay.py --pool top5_rotation_2026_09_18.json --date 2026-09-18 --shard ${{ matrix.shard }} --shards 5 --out out/s18_top5/shard_${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s18-top5-${{ matrix.shard }}
+          path: sol-alpha-wallet-discovery/out/s18_top5/shard_${{ matrix.shard }}.json

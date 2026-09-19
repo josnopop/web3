@@ -1,17 +1,8 @@
--- 2026-09-03 historical forward test: wallet pool must use only data before
--- 2026-09-03 00:00:00 UTC+8 (2026-09-02 16:00:00 UTC).
--- Cost safety: this query is time-partition constrained and the Python runner dry-runs
--- it before execution with MAX_BYTES_BILLED.
-
+-- V0.3 historical market-wide discovery. All rows are strictly before @freeze_ts.
 WITH dex_txs AS (
   SELECT
-    block_slot,
-    block_timestamp,
-    signature,
-    accounts,
-    balance_changes,
-    pre_token_balances,
-    post_token_balances,
+    block_slot, block_timestamp, signature, accounts, balance_changes,
+    pre_token_balances, post_token_balances,
     (
       SELECT a.pubkey
       FROM UNNEST(accounts) AS a WITH OFFSET off
@@ -20,55 +11,32 @@ WITH dex_txs AS (
       LIMIT 1
     ) AS wallet
   FROM `bigquery-public-data.crypto_solana_mainnet_us.Transactions`
-  WHERE block_timestamp >= TIMESTAMP('2026-08-03 16:00:00+00')
-    AND block_timestamp <  TIMESTAMP('2026-09-02 16:00:00+00')
+  WHERE block_timestamp >= @lookback_start
+    AND block_timestamp < @freeze_ts
     AND err IS NULL
     AND EXISTS (
-      SELECT 1
-      FROM UNNEST(accounts) AS a
-      WHERE a.pubkey IN (
-        '6EF8rrecthR5Dkzf5NzcraK8xtoqf2QvF6C4Zss5F6P',
-        'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',
-        'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4',
-        '675kPX9MHTjS2zt1qfr1NYHuzeP4f4VgFkZyJgB9wCt',
-        'CAMMCzo5YL8w4VFF8KVHrK22GGUQpKHpHrG2GGLS6V',
-        'LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo',
-        'whirLbMiicVdio4qvUfM5KAg6CtB8VDbQ8tX1YDPJ2'
-      )
+      SELECT 1 FROM UNNEST(accounts) a
+      WHERE a.pubkey IN UNNEST(@dex_program_ids)
     )
 ),
 eligible_txs AS (
-  -- "Full market" discovery starts from every signer that actually touched a covered
-  -- Solana DEX/launch program in the lookback. No hand-picked wallet list.
-  SELECT *
-  FROM dex_txs
-  WHERE wallet IS NOT NULL
+  SELECT * FROM dex_txs WHERE wallet IS NOT NULL
 ),
 pre_bal AS (
   SELECT
-    t.block_slot, t.block_timestamp, t.signature, t.wallet,
-    b.mint,
+    t.block_slot, t.block_timestamp, t.signature, t.wallet, b.mint,
     SAFE_DIVIDE(CAST(b.amount AS BIGNUMERIC), POW(10, b.decimals)) AS pre_amount
   FROM eligible_txs t, UNNEST(t.pre_token_balances) b
   WHERE b.owner = t.wallet
-    AND b.mint NOT IN (
-      'So11111111111111111111111111111111111111112',
-      'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-      'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
-    )
+    AND b.mint NOT IN UNNEST(@quote_mints)
 ),
 post_bal AS (
   SELECT
-    t.block_slot, t.block_timestamp, t.signature, t.wallet,
-    b.mint,
+    t.block_slot, t.block_timestamp, t.signature, t.wallet, b.mint,
     SAFE_DIVIDE(CAST(b.amount AS BIGNUMERIC), POW(10, b.decimals)) AS post_amount
   FROM eligible_txs t, UNNEST(t.post_token_balances) b
   WHERE b.owner = t.wallet
-    AND b.mint NOT IN (
-      'So11111111111111111111111111111111111111112',
-      'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-      'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
-    )
+    AND b.mint NOT IN UNNEST(@quote_mints)
 ),
 token_deltas AS (
   SELECT
@@ -94,125 +62,136 @@ native_delta AS (
     ), 0) AS FLOAT64) AS sol_delta
   FROM eligible_txs t
 ),
-trades AS (
+clean_trades AS (
   SELECT
-    d.block_slot,
-    d.block_timestamp,
-    d.signature,
-    d.wallet,
-    d.mint,
-    d.token_delta,
-    n.sol_delta,
+    d.block_slot, d.block_timestamp, d.signature, d.wallet, d.mint,
     CASE
       WHEN d.token_delta > 0 AND n.sol_delta < 0 THEN 'BUY'
       WHEN d.token_delta < 0 AND n.sol_delta > 0 THEN 'SELL'
-      ELSE 'OTHER'
     END AS side,
-    CASE
-      WHEN d.token_delta > 0 AND n.sol_delta < 0 THEN -n.sol_delta
-      ELSE 0
-    END AS quote_out_sol,
-    CASE
-      WHEN d.token_delta < 0 AND n.sol_delta > 0 THEN n.sol_delta
-      ELSE 0
-    END AS quote_in_sol
+    IF(d.token_delta > 0 AND n.sol_delta < 0, -n.sol_delta, 0) AS quote_out_sol,
+    IF(d.token_delta < 0 AND n.sol_delta > 0, n.sol_delta, 0) AS quote_in_sol
   FROM token_deltas d
   JOIN native_delta n USING (signature, wallet)
-  WHERE ABS(d.token_delta) > 0
+  WHERE (d.token_delta > 0 AND n.sol_delta < 0)
+     OR (d.token_delta < 0 AND n.sol_delta > 0)
 ),
-clean_trades AS (
-  SELECT *
-  FROM trades
-  WHERE side IN ('BUY','SELL')
-    -- remove obvious zero-value dust / pure fee effects
-    AND (quote_out_sol >= 0.0005 OR quote_in_sol >= 0.0005)
+periods AS (
+  SELECT 7 AS days UNION ALL SELECT 15 UNION ALL SELECT 30
+),
+window_trades AS (
+  SELECT p.days, t.*
+  FROM clean_trades t
+  CROSS JOIN periods p
+  WHERE t.block_timestamp >= TIMESTAMP_SUB(@freeze_ts, INTERVAL p.days DAY)
+    AND (t.quote_out_sol >= 0.0005 OR t.quote_in_sol >= 0.0005)
 ),
 token_stats AS (
   SELECT
-    wallet,
-    mint,
+    days, wallet, mint,
     COUNTIF(side='BUY') AS buys,
     COUNTIF(side='SELL') AS sells,
     SUM(quote_out_sol) AS spent_sol,
     SUM(quote_in_sol) AS received_sol,
     MIN(IF(side='BUY', block_timestamp, NULL)) AS first_buy_ts,
     MAX(IF(side='SELL', block_timestamp, NULL)) AS last_sell_ts
-  FROM clean_trades
-  GROUP BY wallet, mint
+  FROM window_trades
+  GROUP BY days, wallet, mint
 ),
-wallet_minute AS (
-  SELECT wallet, TIMESTAMP_TRUNC(block_timestamp, MINUTE) minute, COUNT(*) n
-  FROM clean_trades
-  GROUP BY wallet, minute
+token_closed AS (
+  SELECT *,
+    received_sol - spent_sol AS token_pnl,
+    SAFE_DIVIDE(received_sol - spent_sol, NULLIF(spent_sol, 0)) AS token_roi
+  FROM token_stats
+  WHERE buys > 0 AND sells > 0
 ),
-wallet_slot AS (
-  SELECT wallet, block_slot, COUNT(*) n
-  FROM clean_trades
-  GROUP BY wallet, block_slot
+ranked_profit AS (
+  SELECT *,
+    ROW_NUMBER() OVER (
+      PARTITION BY days, wallet
+      ORDER BY GREATEST(token_pnl, 0) DESC
+    ) AS rn,
+    SUM(GREATEST(token_pnl, 0)) OVER (
+      PARTITION BY days, wallet
+    ) AS positive_profit
+  FROM token_closed
 ),
 wallet_base AS (
   SELECT
-    wallet,
+    days, wallet,
     COUNT(DISTINCT signature) AS dex_txs,
     COUNT(DISTINCT DATE(block_timestamp)) AS active_days,
-    COUNT(DISTINCT mint) AS distinct_tokens,
-    COUNTIF(side='BUY') AS buys,
-    COUNTIF(side='SELL') AS sells,
-    SUM(quote_out_sol) AS gross_quote_out_sol,
-    SUM(quote_in_sol) AS gross_quote_in_sol
-  FROM clean_trades
-  GROUP BY wallet
+    COUNT(DISTINCT mint) AS distinct_tokens
+  FROM window_trades
+  GROUP BY days, wallet
 ),
 wallet_token AS (
   SELECT
-    wallet,
-    SUM(IF(buys > 0 AND sells > 0, received_sol - spent_sol, 0)) AS realized_quote_pnl_sol,
-    COUNTIF(buys > 0 AND sells > 0 AND received_sol > spent_sol) AS win_tokens,
-    COUNTIF(buys > 0 AND sells > 0) AS closed_tokens,
+    days, wallet,
+    SUM(token_pnl) AS realized_pnl_sol,
+    COUNTIF(token_pnl > 0) AS win_tokens,
+    COUNT(*) AS closed_tokens,
+    APPROX_QUANTILES(token_roi, 100)[OFFSET(50)] AS median_token_roi,
     APPROX_QUANTILES(
-      IF(first_buy_ts IS NOT NULL AND last_sell_ts IS NOT NULL,
-         TIMESTAMP_DIFF(last_sell_ts, first_buy_ts, MINUTE), NULL), 100
+      TIMESTAMP_DIFF(last_sell_ts, first_buy_ts, MINUTE), 100
     )[OFFSET(50)] AS median_hold_minutes,
-    COUNTIF(
-      buys > 0 AND sells > 0
-      AND spent_sol >= 0.05
-      AND SAFE_DIVIDE(received_sol - spent_sol, spent_sol) <= -0.90
-    ) AS rug_like_tokens
-  FROM token_stats
-  GROUP BY wallet
+    COUNTIF(spent_sol >= 0.05 AND token_roi <= -0.90) AS rug_like_tokens
+  FROM token_closed
+  GROUP BY days, wallet
+),
+concentration AS (
+  SELECT
+    days, wallet,
+    SAFE_DIVIDE(
+      MAX(IF(rn=1, GREATEST(token_pnl,0), 0)),
+      MAX(positive_profit)
+    ) AS top1_profit_concentration,
+    SAFE_DIVIDE(
+      SUM(IF(rn<=3, GREATEST(token_pnl,0), 0)),
+      MAX(positive_profit)
+    ) AS top3_profit_concentration
+  FROM ranked_profit
+  GROUP BY days, wallet
+),
+minute_counts AS (
+  SELECT days, wallet, TIMESTAMP_TRUNC(block_timestamp, MINUTE) AS minute, COUNT(*) AS n
+  FROM window_trades
+  GROUP BY days, wallet, minute
+),
+minute_features AS (
+  SELECT days, wallet, MAX(n) AS max_trades_per_minute
+  FROM minute_counts
+  GROUP BY days, wallet
+),
+slot_counts AS (
+  SELECT days, wallet, block_slot, COUNT(*) AS n
+  FROM window_trades
+  GROUP BY days, wallet, block_slot
 ),
 slot_features AS (
   SELECT
-    wallet,
+    days, wallet,
     SAFE_DIVIDE(SUM(IF(n > 1, n, 0)), SUM(n)) AS same_slot_ratio
-  FROM wallet_slot
-  GROUP BY wallet
-),
-minute_features AS (
-  SELECT wallet, MAX(n) AS max_trades_per_minute
-  FROM wallet_minute
-  GROUP BY wallet
+  FROM slot_counts
+  GROUP BY days, wallet
 )
 SELECT
-  b.wallet,
-  b.dex_txs,
-  b.active_days,
-  b.distinct_tokens,
-  b.buys,
-  b.sells,
-  b.gross_quote_out_sol,
-  b.gross_quote_in_sol,
-  COALESCE(t.realized_quote_pnl_sol, 0) AS realized_quote_pnl_sol,
-  COALESCE(t.win_tokens, 0) AS win_tokens,
-  COALESCE(t.closed_tokens, 0) AS closed_tokens,
-  COALESCE(CAST(t.median_hold_minutes AS FLOAT64), 0) AS median_hold_minutes,
-  COALESCE(t.rug_like_tokens, 0) AS rug_like_tokens,
-  COALESCE(s.same_slot_ratio, 0) AS same_slot_ratio,
-  COALESCE(m.max_trades_per_minute, 0) AS max_trades_per_minute
+  b.days, b.wallet, b.dex_txs, b.active_days, b.distinct_tokens,
+  COALESCE(t.realized_pnl_sol,0) AS realized_pnl_sol,
+  COALESCE(t.win_tokens,0) AS win_tokens,
+  COALESCE(t.closed_tokens,0) AS closed_tokens,
+  COALESCE(t.median_token_roi,0) AS median_token_roi,
+  COALESCE(c.top1_profit_concentration,0) AS top1_profit_concentration,
+  COALESCE(c.top3_profit_concentration,0) AS top3_profit_concentration,
+  COALESCE(CAST(t.median_hold_minutes AS FLOAT64),0) AS median_hold_minutes,
+  COALESCE(t.rug_like_tokens,0) AS rug_like_tokens,
+  COALESCE(s.same_slot_ratio,0) AS same_slot_ratio,
+  COALESCE(m.max_trades_per_minute,0) AS max_trades_per_minute
 FROM wallet_base b
-LEFT JOIN wallet_token t USING(wallet)
-LEFT JOIN slot_features s USING(wallet)
-LEFT JOIN minute_features m USING(wallet)
+LEFT JOIN wallet_token t USING(days,wallet)
+LEFT JOIN concentration c USING(days,wallet)
+LEFT JOIN slot_features s USING(days,wallet)
+LEFT JOIN minute_features m USING(days,wallet)
 WHERE b.dex_txs >= 5
   AND b.distinct_tokens >= 2
-ORDER BY realized_quote_pnl_sol DESC;
+ORDER BY b.wallet, b.days;

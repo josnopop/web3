@@ -1,0 +1,32 @@
+{
+  "freeze_cutoff_utc": "2026-09-12T16:00:00Z",
+  "replay_date": "2026-09-13",
+  "note": "Final Sep13 active buyer supplement; CKx excluded per fast-path rule.",
+  "wallets": [
+    {
+      "wallet": "8FAQt2mBLNYEcdMmAr3Xc9LDzrZ42ZdzuUZdH2uY8jnY",
+      "score": null,
+      "source": "Sep13 replay active buyer"
+    },
+    {
+      "wallet": "BakXJNBFe4wnXjSHTRPiT5cw33vqsBehgnLouLxLhfyz",
+      "score": null,
+      "source": "Sep13 replay active buyer"
+    },
+    {
+      "wallet": "4EvYSYpt8ZbZNTwB2kjg7s8nXtiESryxCrorFm7cLGLR",
+      "score": null,
+      "source": "Sep13 replay active buyer"
+    },
+    {
+      "wallet": "2gSrymoc2o9cfd13CpaqCWj8SfP5hi87s3tLYMFmg2e9",
+      "score": null,
+      "source": "Sep13 replay active buyer"
+    },
+    {
+      "wallet": "zs6AGzbamkwsdLYDe35iXudVJ3zs7tZbHxwC6ZPdfG4",
+      "score": null,
+      "source": "Sep13 replay active buyer"
+    }
+  ]
+}

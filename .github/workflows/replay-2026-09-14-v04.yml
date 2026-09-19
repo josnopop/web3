@@ -1,0 +1,45 @@
+name: replay-2026-09-14-v04-expanded-pool
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/replay-2026-09-14-v04.yml"
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  replay:
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: sep13-v04-candidates-parallel
+          path: input
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 35433007792
+      - name: Replay expanded Sep13 frozen pool on Sep14
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python mass_replay.py \
+            --candidates ../input/v04_candidates_parallel.json \
+            --date 2026-09-14 \
+            --shard ${{ matrix.shard }} \
+            --shards 20 \
+            --pages 3 \
+            --out out/2026-09-14/v04_replay_${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep14-v04-replay-${{ matrix.shard }}
+          path: sol-alpha-wallet-discovery/out/2026-09-14/v04_replay_*.json
+          if-no-files-found: error

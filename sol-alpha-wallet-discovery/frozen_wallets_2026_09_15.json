@@ -1,0 +1,283 @@
+{
+  "freeze_label": "2026-09-15 strict verified pool v4",
+  "replay_day_local": "2026-09-16",
+  "timezone": "UTC+8",
+  "rules": {
+    "cutoff": "2026-09-15T23:59:59+08:00",
+    "no_hindsight": true,
+    "kol_bonus": 0,
+    "note": "Candidates added only from historical snapshots available by the Sep-15 cutoff.",
+    "wallet_count": 36
+  },
+  "wallets": [
+    {
+      "name": "Gh0stee",
+      "address": "2kv8X2a9bxnBM8NKLc6BBTX2z13GFNRL4oRotMUJRva9"
+    },
+    {
+      "name": "Maze",
+      "address": "7j7AA3HZR2zEjwAQEKPFh2qucLY4fqZpB9iodf39w8xW"
+    },
+    {
+      "name": "gr3g",
+      "address": "J23qr98GjGJJqKq9CBEnyRhHbmkaVxtTJNNxKu597wsA"
+    },
+    {
+      "name": "Mr. Frog",
+      "address": "4DdrfiDHpmx55i4SPssxVzS9ZaKLb8qr45NKY9Er9nNh"
+    },
+    {
+      "name": "Dani",
+      "address": "AuPp4YTMTyqxYXQnHc5KUc6pUuCSsHQpBJhgnD45yqrf"
+    },
+    {
+      "name": "slingoor",
+      "address": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij",
+      "note": "MadeOnSol historical report-linked identity used for this replay"
+    },
+    {
+      "name": "OGAntD",
+      "address": "215nhcAHjQQGgwpQSJQ7zR26etbjjtVdW74NLzwEgQjP"
+    },
+    {
+      "name": "cap",
+      "address": "CAPn1yH4oSywsxGU456jfgTrSSUidf9jgeAnHceNUJdw"
+    },
+    {
+      "name": "decu",
+      "address": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
+    },
+    {
+      "name": "Schoen",
+      "address": "5hAgYC8TJCcEZV7LTXAzkTrm7YL29YXyQQJPCNrG84zM"
+    },
+    {
+      "name": "japbitch",
+      "address": "DemfvB4iwd3NmVquvWqWbB92yVZWFFqybqBeJGdyEeM6"
+    },
+    {
+      "name": "trunoest",
+      "address": "ardinRsN1mNYVeoJWTBsWeYeXvuR9UUDGMsCDKpb6AT"
+    },
+    {
+      "name": "bandit",
+      "address": "5B79fMkcFeRTiwm7ehsZsFiKsC7m7n1Bgv9yLxPp9q2X"
+    },
+    {
+      "name": "merky",
+      "address": "ATpSExwhE2x1H7rv6Uoi4TJdzGz15LjDXNzhV6pjDVYi"
+    },
+    {
+      "name": "36A6…kDKG",
+      "address": "36A6mEN5rYJdVTb6fMqVvG6ez8g2mTYdr1omWcQ1kDKG"
+    },
+    {
+      "name": "Megga",
+      "address": "H31vEBxSJk1nQdUN11qZgZyhScyShhscKhvhZZU3dQoU",
+      "snapshot": "2026-09-14",
+      "wr_30d": 0.817,
+      "roi_30d": 1.05,
+      "trades_30d": 1213,
+      "pnl_usd_30d": 138621
+    },
+    {
+      "name": "Otta",
+      "address": "As7HjL7dzzvbRbaD3WCun47robib2kmAKRXMvjHkSMB5",
+      "snapshot": "2026-09-14",
+      "wr_30d": 0.929,
+      "roi_30d": 1.307,
+      "trades_30d": 217,
+      "pnl_usd_30d": 39622
+    },
+    {
+      "name": "West",
+      "address": "JDd3hy3gQn2V982mi1zqhNqUw1GfV2UL6g76STojCJPN",
+      "snapshot": "2026-09-12",
+      "wr_30d": 0.783,
+      "roi_30d": 0.243,
+      "trades_30d": 978,
+      "pnl_usd_30d": 87965,
+      "note": "strong but higher concentration/drawdown; keep under concentration check"
+    },
+    {
+      "name": "Gasp",
+      "address": "xyzfhxfy8NhfeNG3Um3WaUvFXzNuHkrhrZMD8dsStB6",
+      "snapshot": "2026-09-12",
+      "wr_30d": 0.694,
+      "roi_30d": 0.541,
+      "trades_30d": 1355,
+      "pnl_usd_30d": 48284
+    },
+    {
+      "name": "blixze",
+      "address": "5vg7he5HibvsAW86wfiuP6jw7VwKmUAnP6P93mVCdpJu",
+      "snapshot": "2026-09-12",
+      "wr_30d": 0.69,
+      "roi_30d": 0.856,
+      "trades_30d": 539,
+      "pnl_usd_30d": 43965
+    },
+    {
+      "name": "Dan",
+      "address": "qNGhUruCGJpXJdsnV74USHErcbm3CrXRsnP8D6Z34Hh",
+      "snapshot": "2026-09-15",
+      "wr_30d": 0.724,
+      "roi_30d": 0.379,
+      "trades_30d": 573,
+      "pnl_usd_30d": 28160
+    },
+    {
+      "name": "Qavec",
+      "address": "gangJEP5geDHjPVRhDS5dTF5e6GtRvtNogMEEVs91RV",
+      "snapshot": "2026-09-15",
+      "wr_30d": 0.616,
+      "roi_30d": 0.303,
+      "trades_30d": 1868,
+      "pnl_usd_30d": 36807
+    },
+    {
+      "name": "k4ye",
+      "address": "5fHJszey2UdB2nETS1y6NS2wSG4ic9byKtbgJzaYzGeV",
+      "snapshot": "2026-09-12",
+      "wr_30d": 1,
+      "roi_30d": 0.66,
+      "trades_30d": 2327,
+      "pnl_usd_30d": 37727,
+      "note": "Radar/anomaly flag: unusually perfect WR; must survive chain recomputation"
+    },
+    {
+      "name": "Cented",
+      "address": "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",
+      "snapshot": "2026-09-08",
+      "wr_30d": 0.7742,
+      "trades_30d": 2428,
+      "pnl_usd_30d": 224081,
+      "note": "high-frequency; latency/copyability check required"
+    },
+    {
+      "name": "Cupsey",
+      "address": "2fg5QD1eD7rzNNCsvnhmXFm5hqNgwTTG8p7kQ6f3rx6f",
+      "snapshot": "2026-09-08",
+      "wr_30d": 0.9425,
+      "trades_30d": 2346,
+      "pnl_usd_30d": 447372,
+      "note": "very high WR/high-frequency; speed/anomaly check required"
+    },
+    {
+      "name": "Dior",
+      "address": "87rRdssFiTJKY4MGARa4G5vQ31hmR7MxSmhzeaJ5AAxJ",
+      "snapshot": "2026-09-08",
+      "wr_30d": 0.5395,
+      "trades_30d": 1655,
+      "pnl_usd_30d": 366009,
+      "note": "positive expectancy / confirmation candidate; lower hit rate"
+    },
+    {
+      "name": "Gake",
+      "address": "DNfuF1L62WWyW3pNakVkyGGFzVVhj4Yr52jSmdTyeBHm",
+      "snapshot": "2026-09-08",
+      "wr_30d": 1,
+      "trades_30d": 80,
+      "pnl_usd_30d": 184788,
+      "note": "Radar/anomaly: 100% WR; do not treat as automatically copyable"
+    },
+    {
+      "name": "Clown",
+      "address": "EDXHdSFdadFbYFFjxPXBqMe1kCEDFqpPu552uvp48HR8",
+      "snapshot": "2026-09-13",
+      "wallet_class_hint": "Copyable Wallet",
+      "wr_30d": 0.828,
+      "roi_30d": 1.383,
+      "trades_30d": 1780,
+      "pnl_usd_30d": 161465,
+      "note": "strong broad sample; top1 concentration still checked before direct copy"
+    },
+    {
+      "name": "Kadenox",
+      "address": "B32QbbdDAyhvUQzjcaM5j6ZVKwjCxAwGH5Xgvb9SJqnC",
+      "snapshot": "2026-09-15",
+      "wallet_class_hint": "Copyable Wallet",
+      "wr_30d": 0.882,
+      "roi_30d": 1.135,
+      "trades_30d": 1543,
+      "pnl_usd_30d": 90341,
+      "note": "high WR; bot/speed checks still required"
+    },
+    {
+      "name": "Risk",
+      "address": "BHREKFkPQgAtDs8Vb1UfLkUpjG6ScidTjHaCWFuG2AtX",
+      "snapshot": "2026-09-15",
+      "wallet_class_hint": "Confirmation Wallet",
+      "wr_30d": 0.778,
+      "roi_30d": 4.397,
+      "trades_30d": 311,
+      "pnl_usd_30d": 167207,
+      "note": "very high profit concentration; confirmation only unless concentration passes"
+    },
+    {
+      "name": "Jidn",
+      "address": "3h65MmPZksoKKyEpEjnWU2Yk2iYT5oZDNitGy5cTaxoE",
+      "snapshot": "2026-09-12",
+      "wallet_class_hint": "Confirmation Wallet",
+      "wr_30d": 0.533,
+      "roi_30d": 0.822,
+      "trades_30d": 1197,
+      "pnl_usd_30d": 125974,
+      "note": "positive expectancy but lower hit rate"
+    },
+    {
+      "name": "deecayz",
+      "address": "Dv32u9mvSXGVNshf7xM7afuMoPRifQxzuzEjfmfMysZY",
+      "snapshot": "2026-09-14",
+      "wallet_class_hint": "Non-copyable Alpha",
+      "wr_30d": 0.545,
+      "roi_30d": 0.888,
+      "trades_30d": 302,
+      "pnl_usd_30d": 151551,
+      "note": "returns heavily concentrated in one winner; use as signal confirmation"
+    },
+    {
+      "name": "narc",
+      "address": "CxgPWvH2GoEDENELne2XKAR2z2Fr4shG2uaeyqZceGve",
+      "snapshot": "2026-09-15",
+      "wallet_class_hint": "Confirmation Wallet",
+      "wr_30d": 0.603,
+      "roi_30d": 0.92,
+      "trades_30d": 1160,
+      "pnl_usd_30d": 233494,
+      "note": "broad sample; concentration check required"
+    },
+    {
+      "name": "Johnson",
+      "address": "J9TYAsWWidbrcZybmLSfrLzryANf4CgJBLdvwdGuC8MB",
+      "snapshot": "2026-09-14",
+      "wallet_class_hint": "Non-copyable Alpha",
+      "wr_30d": 0.452,
+      "roi_30d": 0.443,
+      "trades_30d": 6369,
+      "pnl_usd_30d": 190606,
+      "note": "extreme activity; signal/confirmation use, not blind copying"
+    },
+    {
+      "name": "EqiF…r1Zb",
+      "address": "EqiFgyNw6kgrmYstWyrP8VjKhka7XEmKTZzHSmwpr1Zb",
+      "snapshot": "2026-09-15",
+      "wallet_class_hint": "Non-copyable Alpha",
+      "wr_30d": 0.6,
+      "roi_30d": 0.575,
+      "trades_30d": 8040,
+      "pnl_usd_30d": 160900,
+      "note": "extreme activity; signal/confirmation use"
+    },
+    {
+      "name": "Rayan",
+      "address": "BNahnx13rLru9zxuWNGBD7vVv1pGQXB11Q7qeTyupdWf",
+      "snapshot": "2026-09-08",
+      "wallet_class_hint": "Non-copyable Alpha",
+      "wr_30d": 0.4571,
+      "trades_30d": 5153,
+      "pnl_usd_30d": 670067,
+      "note": "very high frequency and sub-50% hit rate; confirmation only"
+    }
+  ]
+}

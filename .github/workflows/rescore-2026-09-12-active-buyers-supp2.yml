@@ -1,0 +1,29 @@
+name: rescore-2026-09-12-active-buyers-supp2
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/rescore-2026-09-12-active-buyers-supp2.yml"
+  workflow_dispatch:
+jobs:
+  rescore:
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        shard: [0,1,2,3,4]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Strict rescore at Sep12 cutoff
+        working-directory: sol-alpha-wallet-discovery
+        run: python history_rescore.py --candidates active_alpha_buyers_2026_09_13_supp2.json --cutoff-date 2026-09-13 --shard ${{ matrix.shard }} --shards 5 --pages 5 --out out/2026-09-12/supp2_rescore_${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep12-supp2-rescore-${{ matrix.shard }}
+          path: sol-alpha-wallet-discovery/out/2026-09-12/supp2_rescore_*.json
+          if-no-files-found: error

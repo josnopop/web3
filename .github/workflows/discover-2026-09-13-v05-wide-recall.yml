@@ -1,0 +1,113 @@
+name: discover-2026-09-13-v05-wide-recall
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/discover-2026-09-13-v05-wide-recall.yml"
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: sep13-v04-history
+          path: input
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 35433007792
+      - name: Prepare 60 historical token mints
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python prepare_historical_mints.py \
+            --history ../input/v04_history.json \
+            --limit 60 \
+            --out out/2026-09-13/v05_mints.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep13-v05-input
+          path: |
+            input/v04_history.json
+            sol-alpha-wallet-discovery/out/2026-09-13/v05_mints.json
+          if-no-files-found: error
+
+  early:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      max-parallel: 30
+      matrix:
+        index: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install requirements
+        working-directory: sol-alpha-wallet-discovery
+        run: pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: sep13-v05-input
+          path: input
+      - name: Reverse-discover wider early-buyer pool
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python reverse_discover_early_buyers.py \
+            --mints ../input/v05_mints.json \
+            --index ${{ matrix.index }} \
+            --max-pages 2 \
+            --tx-limit 300 \
+            --buyers 30 \
+            --out out/2026-09-13/v05_early_${{ matrix.index }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep13-v05-early-${{ matrix.index }}
+          path: sol-alpha-wallet-discovery/out/2026-09-13/v05_early_*.json
+          if-no-files-found: error
+
+  merge:
+    needs: [prepare, early]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: sep13-v05-input
+          path: input/history
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sep13-v05-early-*
+          path: input/early
+          merge-multiple: true
+      - name: Merge and benchmark discovery recall
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python merge_walkforward_sources.py \
+            --history ../input/history/v04_history.json \
+            --early-dir ../input/early \
+            --cutoff-date 2026-09-13 \
+            --out out/2026-09-13/v05_candidates.json
+          python discovery_recall_benchmark.py \
+            --candidates out/2026-09-13/v05_candidates.json \
+            --out out/2026-09-13/v05_recall.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep13-v05-candidates
+          path: |
+            sol-alpha-wallet-discovery/out/2026-09-13/v05_candidates.json
+            sol-alpha-wallet-discovery/out/2026-09-13/v05_recall.json
+          if-no-files-found: error

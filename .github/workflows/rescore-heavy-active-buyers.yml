@@ -1,0 +1,31 @@
+name: rescore-2026-09-15-heavy-active-buyers
+
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/rescore-heavy-active-buyers.yml"
+  workflow_dispatch:
+
+jobs:
+  rescore:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        shard: [2,3,7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Strictly rescore heavy Sep16 buyer
+        working-directory: sol-alpha-wallet-discovery
+        run: python history_rescore.py --candidates active_alpha_buyers_2026_09_16.json --cutoff-date 2026-09-16 --shard ${{ matrix.shard }} --shards 16 --pages 5 --out out/heavy_active_rescore/rescore_${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heavy-active-rescore-${{ matrix.shard }}
+          path: sol-alpha-wallet-discovery/out/heavy_active_rescore/rescore_*.json
+          if-no-files-found: error

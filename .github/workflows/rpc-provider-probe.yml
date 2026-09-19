@@ -1,0 +1,19 @@
+name: solana-rpc-provider-probe
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - "sol-alpha-wallet-discovery/rpc_provider_probe.py"
+      - ".github/workflows/rpc-provider-probe.yml"
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Probe historical getTransaction providers
+        working-directory: sol-alpha-wallet-discovery
+        run: python rpc_provider_probe.py

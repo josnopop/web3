@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-18",
+  "wallets": [
+    {
+      "name": "candidate_alpha_insider",
+      "wallet": "AVAZvHLR2PcWpDf8BXY4rVxNHYRBytycHkcB5z5QNXYm",
+      "win_rate": 0.824
+    },
+    {
+      "name": "candidate_market_master",
+      "wallet": "ECCKBDWX3MkEcf3bULbLBb9FvrEQLsmPMFTKFpvjzqgP",
+      "win_rate": 0.742
+    },
+    {
+      "name": "candidate_core_trader",
+      "wallet": "9jyqFiLnruggwNn4EQwBNFXwpbLM9hrA4hV59ytyAVVz",
+      "win_rate": 0.736
+    },
+    {
+      "name": "candidate_alpha_whale",
+      "wallet": "3tc4BVAdzjr1JpeZu6NAjLHyp4kK3iic7TexMBYGJ4Xk",
+      "win_rate": 0.718
+    },
+    {
+      "name": "candidate_mega_trader",
+      "wallet": "2RssnB7hcrnBEx55hXMKT1E7gN27g9ecQFbbCc5Zjajq",
+      "win_rate": 0.702
+    }
+  ]
+}

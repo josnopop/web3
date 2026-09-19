@@ -1,0 +1,49 @@
+{
+  "freeze_cutoff_utc": "2026-09-14T16:00:00Z",
+  "replay_date": "2026-09-15",
+  "partial": true,
+  "note": "Active BUY wallets from completed Sep15 replay shards; strict rescore uses only pre-cutoff chain history.",
+  "wallets": [
+    {
+      "wallet": "BmCkRoBxKfQ5XQpQ4VsRcXsaqK27YP9iu8tw7BJ6HYHd",
+      "score": 67.121
+    },
+    {
+      "wallet": "6SAzeAUFCxCWwrDikbkkKZigre1SiJ7hcZE6gHwkuMJf",
+      "score": 61.135
+    },
+    {
+      "wallet": "7DZ9JR75f94gYhd9dS4fDuuHqemVGmdSt5WAmZPYdCtw",
+      "score": 50.249
+    },
+    {
+      "wallet": "2BP1dKLFs6C27zVgrJMYJvVPGpBPoA5emm97KdjaxNm5",
+      "score": 48.643
+    },
+    {
+      "wallet": "tkGUThnncnciLbGmZ7t3Wr28zrmaCfumnk2B1AnR6E7",
+      "score": null,
+      "source": "Sep15 replay active buyer"
+    },
+    {
+      "wallet": "CP4PeRPAvqxbMyjV8oHm4CprabSvH3pamPHSvAFQ6iE5",
+      "score": null,
+      "source": "Sep15 replay active buyer"
+    },
+    {
+      "wallet": "4EvYSYpt8ZbZNTwB2kjg7s8nXtiESryxCrorFm7cLGLR",
+      "score": null,
+      "source": "Sep15 replay active buyer"
+    },
+    {
+      "wallet": "CPyx4knNxjXMpQrSRwHpMzAiYBEUUrWACxHhqEdKWFc9",
+      "score": null,
+      "source": "Sep15 replay active buyer"
+    },
+    {
+      "wallet": "9Ne9CG3KLEabv5GTP8tSeRnp4p8L57rb4cjprkczxDj8",
+      "score": null,
+      "source": "Sep15 replay active buyer"
+    }
+  ]
+}

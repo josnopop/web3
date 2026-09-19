@@ -1,0 +1,53 @@
+{
+  "purpose": "fast chain validation of highest-priority recent S candidates",
+  "wallets": [
+    {
+      "wallet": "2NoNSAa4F9Srj3M6myFtKTk9VWrYqyHBMbCwwepfYmwi",
+      "source_score": 93.4
+    },
+    {
+      "wallet": "4YrqTrUJ7JMNTPvRJeRN3TGxQ4KiPz7tom83XJN6aUa1",
+      "source_score": 93.2
+    },
+    {
+      "wallet": "2ksQ77e9e5SS6VA6poanRGWfkU3R4R5wZnptbJHb2nx9",
+      "source_score": 91.107
+    },
+    {
+      "wallet": "7Mn84HYtybo6E4ctY3wui7SSmKkWrCQC5vJhzb7399Jb",
+      "source_score": 89.508
+    },
+    {
+      "wallet": "wae8YMC7PWjcPbM3mdx3CUDZEkkjaFAE4VxS5mF2YuN",
+      "source_score": 89.225
+    },
+    {
+      "wallet": "89ho2fj1oRxe6gvRiCfrxEx3MRnNujDwgtq3XeahpjDV",
+      "source_score": 85.5
+    },
+    {
+      "wallet": "FzvhXczqVpnAjXnyDTc5eWiqyPaBJ8P3aSLWSASTj3Yu",
+      "source_score": 84.808
+    },
+    {
+      "wallet": "cATq48AALCiD2hECKZDgKHp3VoSHbXc4aDxSzgQLbc3",
+      "source_score": 84.8
+    },
+    {
+      "wallet": "YTea8QH9gyMgpBBGVB4j9dRzi3ybns4qYJoCHB2hem8",
+      "source_score": 82.7
+    },
+    {
+      "wallet": "GijFWw4oNyh9ko3FaZforNsi3jk6wDovARpkKahPD4o5",
+      "source_score": 82.332
+    },
+    {
+      "wallet": "pumpSuAxFePbNXz2CbmfJfrWNCgb4LbxafWRGYFhAfQ",
+      "source_score": 82
+    },
+    {
+      "wallet": "qstPZikkjwHGPMCRHWMeuTpFfTYxstDgwyg1SPYKC92",
+      "source_score": 80.6
+    }
+  ]
+}

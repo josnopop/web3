@@ -1,0 +1,24 @@
+name: s18-active-candidates-replay
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths: [".github/workflows/s18-active-candidates-replay.yml", "sol-alpha-wallet-discovery/active_candidates_2026_09_18.json"]
+jobs:
+ replay:
+  strategy:
+    fail-fast: false
+    matrix:
+      shard: [0,1,2,3,4]
+  runs-on: ubuntu-latest
+  timeout-minutes: 30
+  steps:
+    - uses: actions/checkout@v4
+    - name: Replay candidate
+      working-directory: sol-alpha-wallet-discovery
+      run: |
+        mkdir -p out/s18_active
+        python s_quote_replay.py --pool active_candidates_2026_09_18.json --date 2026-09-18 --shard ${{ matrix.shard }} --shards 5 --out out/s18_active/shard_${{ matrix.shard }}.json
+    - uses: actions/upload-artifact@v4
+      with:
+        name: s18-active-${{ matrix.shard }}
+        path: sol-alpha-wallet-discovery/out/s18_active/shard_${{ matrix.shard }}.json

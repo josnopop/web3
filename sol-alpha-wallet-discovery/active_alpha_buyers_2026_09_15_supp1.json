@@ -1,0 +1,17 @@
+{
+  "freeze_cutoff_utc": "2026-09-14T16:00:00Z",
+  "replay_date": "2026-09-15",
+  "partial": true,
+  "wallets": [
+    {
+      "wallet": "54FksNZgqEWpZXn3okR5sJ7ELZYnwh8xHMAL1N7KqazQ",
+      "score": 93.935,
+      "source": "Sep15 replay active buyer"
+    },
+    {
+      "wallet": "BfuFYhvCphaYbNCXw7znCUDMTGikecsG66wcv231A6AJ",
+      "score": null,
+      "source": "Sep15 replay active buyer"
+    }
+  ]
+}

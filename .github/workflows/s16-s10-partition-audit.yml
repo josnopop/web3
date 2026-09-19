@@ -1,0 +1,32 @@
+name: s16-s10-partition-audit
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s16-s10-partition-audit.yml"
+      - "sol-alpha-wallet-discovery/s16_s10_partition_audit.py"
+  workflow_dispatch:
+jobs:
+  audit:
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        part: [0,1,2,3,4,5]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Decode partition
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          mkdir -p out/s16_s10_parts
+          python s16_s10_partition_audit.py --part ${{ matrix.part }} --parts 6 --out out/s16_s10_parts/part_${{ matrix.part }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s16-s10-part-${{ matrix.part }}
+          path: sol-alpha-wallet-discovery/out/s16_s10_parts/part_${{ matrix.part }}.json
+          if-no-files-found: error

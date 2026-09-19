@@ -1,9 +1,9 @@
-name: sol-alpha-wallet-discovery-ci
+name: wallet-discovery-tests
 on:
   workflow_dispatch:
 
 concurrency:
-  group: sol-alpha-wallet-discovery-ci-${{ github.ref }}
+  group: wallet-discovery-tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

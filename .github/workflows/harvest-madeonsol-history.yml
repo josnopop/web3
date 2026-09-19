@@ -1,0 +1,27 @@
+name: harvest-madeonsol-history
+
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - "sol-alpha-wallet-discovery/harvest_madeonsol_history.py"
+      - ".github/workflows/harvest-madeonsol-history.yml"
+  workflow_dispatch:
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Harvest 30d dated historical wallets and token mints
+        working-directory: sol-alpha-wallet-discovery
+        run: python harvest_madeonsol_history.py --start 2026-08-17 --end 2026-09-15 --out out/2026-09-15/madeonsol_history_30d.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: madeonsol-history-2026-08-17-to-09-15
+          path: sol-alpha-wallet-discovery/out/2026-09-15/madeonsol_history_30d.json
+          if-no-files-found: error

@@ -1,0 +1,103 @@
+name: discover-2026-09-13-v04-parallel
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/discover-2026-09-13-v04-parallel.yml"
+  workflow_dispatch:
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Harvest dated Sep13 history
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python harvest_madeonsol_history.py \
+            --start 2026-08-15 \
+            --end 2026-09-13 \
+            --out out/2026-09-13/v04_history.json
+          python prepare_historical_mints.py \
+            --history out/2026-09-13/v04_history.json \
+            --limit 20 \
+            --out out/2026-09-13/v04_mints.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep13-v04-history
+          path: |
+            sol-alpha-wallet-discovery/out/2026-09-13/v04_history.json
+            sol-alpha-wallet-discovery/out/2026-09-13/v04_mints.json
+          if-no-files-found: error
+
+  early:
+    needs: harvest
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        index: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install requirements
+        working-directory: sol-alpha-wallet-discovery
+        run: pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: sep13-v04-history
+          path: input
+      - name: Reverse-discover early buyers
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python reverse_discover_early_buyers.py \
+            --mints ../input/v04_mints.json \
+            --index ${{ matrix.index }} \
+            --max-pages 2 \
+            --tx-limit 120 \
+            --buyers 15 \
+            --out out/2026-09-13/early_${{ matrix.index }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep13-v04-early-${{ matrix.index }}
+          path: sol-alpha-wallet-discovery/out/2026-09-13/early_*.json
+          if-no-files-found: error
+
+  merge:
+    needs: [harvest, early]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: sep13-v04-history
+          path: input/history
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sep13-v04-early-*
+          path: input/early
+          merge-multiple: true
+      - name: Merge wallet discovery sources
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python merge_walkforward_sources.py \
+            --history ../input/history/v04_history.json \
+            --early-dir ../input/early \
+            --cutoff-date 2026-09-13 \
+            --out out/2026-09-13/v04_candidates_parallel.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sep13-v04-candidates-parallel
+          path: sol-alpha-wallet-discovery/out/2026-09-13/v04_candidates_parallel.json
+          if-no-files-found: error

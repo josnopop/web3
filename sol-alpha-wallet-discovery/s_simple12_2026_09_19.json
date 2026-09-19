@@ -1,0 +1,82 @@
+{
+  "purpose": "12 high-profit high-win-rate good-sample wallets for 24h follow simulation",
+  "selection_rules": {
+    "tokens_min": 15,
+    "win_rate_min": 0.8,
+    "net_pnl_sol_min": 30
+  },
+  "wallets": [
+    {
+      "wallet": "8TawwodB8Mkk1YnqJjEau5Cerix4wms61Yw1gTAc6n49",
+      "tokens": 22,
+      "win_rate": 1,
+      "net_pnl_sol": 1717.175756
+    },
+    {
+      "wallet": "CkYR4zLcFacxenk1snvwfqJYWkwgUgNz5YBs6RFJnpVB",
+      "tokens": 22,
+      "win_rate": 1,
+      "net_pnl_sol": 36.991012
+    },
+    {
+      "wallet": "2NoNSAa4F9Srj3M6myFtKTk9VWrYqyHBMbCwwepfYmwi",
+      "tokens": 34,
+      "win_rate": 0.9697,
+      "net_pnl_sol": 660.759474
+    },
+    {
+      "wallet": "6GFKaKy2KitmEKRhCLdc63Q3gu9vKP4J6cM3HdXqMzLH",
+      "tokens": 25,
+      "win_rate": 0.9167,
+      "net_pnl_sol": 59.438268
+    },
+    {
+      "wallet": "4YrqTrUJ7JMNTPvRJeRN3TGxQ4KiPz7tom83XJN6aUa1",
+      "tokens": 32,
+      "win_rate": 0.9063,
+      "net_pnl_sol": 43.354192
+    },
+    {
+      "wallet": "wae8YMC7PWjcPbM3mdx3CUDZEkkjaFAE4VxS5mF2YuN",
+      "tokens": 37,
+      "win_rate": 0.8919,
+      "net_pnl_sol": 4086.87555
+    },
+    {
+      "wallet": "6eU217VwYLQdUErwGf3UVywQG4ykAz1dSPo4sSgnBJLA",
+      "tokens": 40,
+      "win_rate": 0.8718,
+      "net_pnl_sol": 115.415832
+    },
+    {
+      "wallet": "89ho2fj1oRxe6gvRiCfrxEx3MRnNujDwgtq3XeahpjDV",
+      "tokens": 15,
+      "win_rate": 0.8667,
+      "net_pnl_sol": 118.026531
+    },
+    {
+      "wallet": "FzvhXczqVpnAjXnyDTc5eWiqyPaBJ8P3aSLWSASTj3Yu",
+      "tokens": 30,
+      "win_rate": 0.8667,
+      "net_pnl_sol": 71.36682
+    },
+    {
+      "wallet": "2ksQ77e9e5SS6VA6poanRGWfkU3R4R5wZnptbJHb2nx9",
+      "tokens": 354,
+      "win_rate": 0.8381,
+      "net_pnl_sol": 289.87227
+    },
+    {
+      "wallet": "7Mn84HYtybo6E4ctY3wui7SSmKkWrCQC5vJhzb7399Jb",
+      "tokens": 83,
+      "win_rate": 0.8219,
+      "net_pnl_sol": 336.258367
+    },
+    {
+      "wallet": "9gxgKRGJGEtYeHKRSp3yjFRNvn8SdfTifMSPQ257SVLn",
+      "tokens": 46,
+      "win_rate": 0.8182,
+      "net_pnl_sol": 677.291447
+    }
+  ]
+}

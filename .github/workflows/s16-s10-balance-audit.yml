@@ -1,0 +1,27 @@
+name: s16-s10-balance-audit
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s16-s10-balance-audit.yml"
+      - "sol-alpha-wallet-discovery/s16_s10_balance_audit.py"
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOLANA_RPC_URL: https://api.mainnet.solana.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Audit S10 balance deltas
+        working-directory: sol-alpha-wallet-discovery
+        run: python s16_s10_balance_audit.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s16-s10-balance-audit
+          path: sol-alpha-wallet-discovery/out/s16_s10_balance_audit.json
+          if-no-files-found: error

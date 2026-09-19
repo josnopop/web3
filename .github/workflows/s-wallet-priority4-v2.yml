@@ -1,0 +1,18 @@
+name: s-wallet-priority4-v2
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s-wallet-priority4-v2.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: s-wallet-priority4-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  retired:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "retired; current priority is 24h S-wallet simulation"

@@ -1,0 +1,28 @@
+name: probe-v03-token-history
+
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - "sol-alpha-wallet-discovery/analyze_token_history.py"
+      - ".github/workflows/probe-v03-token-history.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install solders
+      - name: Reconstruct historical Pump.fun context
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python analyze_token_history.py --mint GKbZ2WH6sbrVLkqbqBeFdjvK4wSFrK7TqNY1LBuTpump --signal-ts 1789546041 --pages 10 --out out/probe_gkbz.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v03-token-history-probe
+          path: sol-alpha-wallet-discovery/out/probe_gkbz.json
+          if-no-files-found: error

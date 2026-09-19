@@ -1,0 +1,42 @@
+name: s16-mainnet-crosscheck-rest
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s16-mainnet-crosscheck-rest.yml"
+  workflow_dispatch:
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - {label: s2, wallet: "CkYR4zLcFacxenk1snvwfqJYWkwgUgNz5YBs6RFJnpVB"}
+          - {label: s4, wallet: "6GFKaKy2KitmEKRhCLdc63Q3gu9vKP4J6cM3HdXqMzLH"}
+          - {label: s7, wallet: "6eU217VwYLQdUErwGf3UVywQG4ykAz1dSPo4sSgnBJLA"}
+          - {label: s8, wallet: "89ho2fj1oRxe6gvRiCfrxEx3MRnNujDwgtq3XeahpjDV"}
+          - {label: s9, wallet: "FzvhXczqVpnAjXnyDTc5eWiqyPaBJ8P3aSLWSASTj3Yu"}
+          - {label: s11, wallet: "7Mn84HYtybo6E4ctY3wui7SSmKkWrCQC5vJhzb7399Jb"}
+          - {label: s12, wallet: "9gxgKRGJGEtYeHKRSp3yjFRNvn8SdfTifMSPQ257SVLn"}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Probe official mainnet exact Sep16
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python diagnose_signature_window.py \
+            --wallet "${{ matrix.wallet }}" \
+            --rpc "https://api.mainnet.solana.com" \
+            --start-ts 1789488000 \
+            --end-ts 1789574400 \
+            --max-pages 20 | tee "../${{ matrix.label }}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "s16-mainnet-${{ matrix.label }}"
+          path: "${{ matrix.label }}.txt"
+          if-no-files-found: error
