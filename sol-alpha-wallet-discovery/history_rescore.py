@@ -8,7 +8,7 @@ from collections import Counter, defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
-from config import DEX_PROGRAM_IDS, QUOTE_MINTS, utc_window_for_local_day
+from config import DEX_PROGRAM_IDS, QUOTE_MINTS, USDC, USDT, WSOL, utc_window_for_local_day
 from public_rpc_scan import DEFAULT_RPC, iter_signatures, rpc_call
 from scoring import WalletFeatures, WindowMetrics, score_wallet
 
@@ -49,9 +49,27 @@ def native_sol_delta(tx, wallet):
     return (post[i] - pre[i]) / 1e9
 
 
+def _program_ids(tx):
+    ids = set()
+    msg = tx.get("transaction", {}).get("message", {})
+    for key in msg.get("accountKeys") or []:
+        pk = _pubkey(key)
+        if pk:
+            ids.add(pk)
+    for ins in msg.get("instructions") or []:
+        pid = ins.get("programId") if isinstance(ins, dict) else None
+        if pid:
+            ids.add(pid)
+    for group in (tx.get("meta") or {}).get("innerInstructions") or []:
+        for ins in group.get("instructions") or []:
+            pid = ins.get("programId") if isinstance(ins, dict) else None
+            if pid:
+                ids.add(pid)
+    return ids
+
+
 def touches_dex(tx):
-    keys = {_pubkey(x) for x in tx["transaction"]["message"].get("accountKeys") or []}
-    return bool(keys & DEX_PROGRAM_IDS)
+    return bool(_program_ids(tx) & DEX_PROGRAM_IDS)
 
 
 def decode_one(tx, wallet, signature):
@@ -60,17 +78,24 @@ def decode_one(tx, wallet, signature):
     meta = tx.get("meta") or {}
     deltas = token_deltas(meta, wallet)
     assets = [(m, d) for m, d in deltas.items() if m not in QUOTE_MINTS]
-    # Fail closed on complex multi-asset transactions; avoids false trade rows.
+    # Keep fail-closed on complex multi-asset transactions, but correctly
+    # recognize routed swaps and wrapped-SOL quote movement.
     if len(assets) != 1:
         return None
     mint, delta = assets[0]
-    sol = native_sol_delta(tx, wallet)
-    if delta > 0 and sol < -0.0005:
-        side, quote = "BUY", -sol
-    elif delta < 0 and sol > 0.0005:
-        side, quote = "SELL", sol
+    native_sol = native_sol_delta(tx, wallet)
+    wsol = float(deltas.get(WSOL, 0.0))
+    quote_sol_delta = native_sol + wsol
+
+    if delta > 0 and quote_sol_delta < -0.0005:
+        side, quote = "BUY", -quote_sol_delta
+    elif delta < 0 and quote_sol_delta > 0.0005:
+        side, quote = "SELL", quote_sol_delta
     else:
+        # USDC/USDT swaps are not converted to SOL here; mixing units would
+        # corrupt PnL. They remain discoverable but are excluded from SOL PnL.
         return None
+
     return {
         "signature": signature,
         "block_time": int(tx.get("blockTime") or 0),
