@@ -16,7 +16,7 @@ jobs:
       matrix:
         index: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,10 +28,10 @@ jobs:
           path: input
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: 35417479678
-      - name: Decode DEX swaps
+      - name: Decode DEX swaps in RPC batches
         working-directory: sol-alpha-wallet-discovery
         run: |
-          python decode_wallet_trades.py --input ../input --out out/2026-09-16/trades_${{ matrix.index }}.json --sleep 0.2
+          python decode_wallet_trades.py --input ../input --out out/2026-09-16/trades_${{ matrix.index }}.json --rpc https://solana-rpc.publicnode.com --batch-size 20
       - uses: actions/upload-artifact@v4
         with:
           name: wallet-trades-2026-09-16-${{ matrix.index }}
