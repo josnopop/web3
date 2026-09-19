@@ -7,9 +7,9 @@ from pathlib import Path
 
 from solders.pubkey import Pubkey
 
-from public_rpc_scan import DEFAULT_RPC, rpc_call
+from config import PUMPFUN_PROGRAM_ID\nfrom public_rpc_scan import DEFAULT_RPC, rpc_call
 
-PUMPFUN = Pubkey.from_string("6EF8rrecthR5Dkzf5NzcraK8xtoqf2QvF6C4Zss5F6P")
+PUMPFUN = Pubkey.from_string(PUMPFUN_PROGRAM_ID)
 
 
 def pubkey(x):
