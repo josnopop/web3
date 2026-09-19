@@ -11,61 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  replay:
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0,1,2,3,4,5,6,7,8,9,10,11]
+  retired:
+    if: ${{ false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Replay one S wallet for Sep18
-        working-directory: sol-alpha-wallet-discovery
-        run: |
-          mkdir -p out/s_day_fast
-          python s_day_replay.py \
-            --pool s_simple12_2026_09_19.json \
-            --date 2026-09-18 \
-            --shard ${{ matrix.shard }} --shards 12 \
-            --pages 4 \
-            --out out/s_day_fast/shard_${{ matrix.shard }}.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: s-day-fast-${{ matrix.shard }}
-          path: sol-alpha-wallet-discovery/out/s_day_fast/shard_${{ matrix.shard }}.json
-          if-no-files-found: error
-
-  simulate:
-    needs: replay
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: s-day-fast-*
-          path: sol-alpha-wallet-discovery/out/s_day_fast/replays
-          merge-multiple: true
-      - name: Calculate 24h PnL
-        working-directory: sol-alpha-wallet-discovery
-        run: |
-          python s_day_simulate.py \
-            --replays out/s_day_fast/replays \
-            --probe-sol 0.03 \
-            --buy-sol 0.10 \
-            --confirm-seconds 600 \
-            --roundtrip-friction 0.015 \
-            --out out/s_day_fast/S_DAY_RESULT.json
-          cat out/s_day_fast/S_DAY_RESULT.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: S-DAY-SIM-FAST-2026-09-18
-          path: sol-alpha-wallet-discovery/out/s_day_fast/
-          if-no-files-found: error
+      - run: echo "retired in favor of batch-RPC single-run simulation"
