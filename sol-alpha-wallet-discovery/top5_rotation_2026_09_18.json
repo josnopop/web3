@@ -1,0 +1,25 @@
+{
+  "purpose": "2026-09-18 top5 rotation experiment",
+  "wallets": [
+    {
+      "wallet": "DNfuF1L62WWyW3pNakVkyGGFzVVhj4Yr52jSmdTyeBHm",
+      "win_rate": 1
+    },
+    {
+      "wallet": "6yVb4pxNwDfr6rovwNnBg3SyKSvDcHGD4WdFPN1JJBqm",
+      "win_rate": 0.931
+    },
+    {
+      "wallet": "JDd3hy3gQn2V982mi1zqhNqUw1GfV2UL6g76STojCJPN",
+      "win_rate": 0.8387
+    },
+    {
+      "wallet": "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",
+      "win_rate": 0.7742
+    },
+    {
+      "wallet": "AeLaMjzxErZt4drbWVWvcxpVyo8p94xu5vrg41eZPFe3",
+      "win_rate": 1
+    }
+  ]
+}
