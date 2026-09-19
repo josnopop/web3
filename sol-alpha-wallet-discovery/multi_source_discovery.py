@@ -427,3 +427,192 @@ def codex_candidates(limit: int = 100) -> list[Evidence]:
     return list(evidence.values())
 
 
+
+
+def gmgn_candidates(limit: int = 200) -> list[Evidence]:
+    exe = shutil.which("gmgn-cli")
+    if not exe:
+        raise RuntimeError("gmgn-cli not installed")
+    cp = subprocess.run(
+        [exe, "track", "smartmoney", "--chain", "sol", "--limit", str(limit), "--raw"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    payload = json.loads(cp.stdout)
+    return [Evidence(w, "GMGN", "smartmoney", True, {}) for w in sorted(_walk_wallets(payload))]
+
+
+def json_bridge(path: str, source: str) -> list[Evidence]:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    return [Evidence(w, source, "json_bridge", True, {}) for w in sorted(_walk_wallets(payload))]
+
+
+def merge(groups: list[list[Evidence]]) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for group in groups:
+        for e in group:
+            row = merged.setdefault(
+                e.wallet,
+                {"wallet": e.wallet, "sources": set(), "evidence": [], "source_count": 0},
+            )
+            row["sources"].add(e.source)
+            row["evidence"].append({
+                "source": e.source,
+                "kind": e.kind,
+                "live_only": e.live_only,
+                "metadata": e.metadata,
+            })
+    out = []
+    for row in merged.values():
+        row["sources"] = sorted(row["sources"])
+        row["source_count"] = len(row["sources"])
+        row["discovery_priority"] = row["source_count"] * 10 + len(row["evidence"])
+        out.append(row)
+    out.sort(key=lambda x: (-x["discovery_priority"], -x["source_count"], x["wallet"]))
+    return out
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--mints-file", help="JSON/text token-mint source for token-top-trader adapters")
+    p.add_argument("--degenradar-json")
+    p.add_argument("--extra-json", action="append", default=[], help="SOURCE=path")
+    p.add_argument("--out", required=True)
+    p.add_argument("--no-okx", action="store_true")
+    p.add_argument("--no-solanatracker", action="store_true")
+    p.add_argument("--no-dexscreener", action="store_true")
+    p.add_argument("--no-cielo", action="store_true")
+    p.add_argument("--no-birdeye", action="store_true")
+    p.add_argument("--no-nansen", action="store_true")
+    p.add_argument("--no-codex", action="store_true")
+    p.add_argument("--no-bitquery", action="store_true")
+    p.add_argument("--no-gmgn", action="store_true")
+    args = p.parse_args()
+
+    mints: set[str] = set()
+    if args.mints_file:
+        txt = Path(args.mints_file).read_text(encoding="utf-8")
+        try:
+            mints.update(_walk_mints(json.loads(txt)))
+        except Exception:
+            mints.update(
+                x for x in re.findall(r"[1-9A-HJ-NP-Za-km-z]{32,44}", txt)
+                if SOL_ADDR_RE.fullmatch(x)
+            )
+
+    groups: list[list[Evidence]] = []
+    runs: list[SourceRun] = []
+
+    def run_source(name: str, enabled: bool, fn):
+        if not enabled:
+            runs.append(SourceRun(name, False, False, 0, "disabled or credentials unavailable"))
+            return
+        try:
+            rows = fn()
+            groups.append(rows)
+            runs.append(SourceRun(name, True, True, len(rows)))
+        except Exception as e:
+            runs.append(SourceRun(name, True, False, 0, f"{type(e).__name__}: {e}"))
+
+    run_source(
+        "OKX Onchain",
+        not args.no_okx
+        and all(os.getenv(k) for k in ("OKX_API_KEY", "OKX_SECRET_KEY", "OKX_API_PASSPHRASE")),
+        okx_candidates,
+    )
+
+    if not args.no_dexscreener:
+        try:
+            more_mints = dexscreener_seed_mints()
+            mints.update(more_mints)
+            runs.append(SourceRun("DEX Screener", True, True, 0, f"seed_mints={len(more_mints)}"))
+        except Exception as e:
+            runs.append(SourceRun("DEX Screener", True, False, 0, f"{type(e).__name__}: {e}"))
+    else:
+        runs.append(SourceRun("DEX Screener", False, False, 0, "disabled"))
+
+    if not args.no_cielo and os.getenv("CIELO_API_KEY"):
+        try:
+            more_mints = cielo_seed_mints()
+            mints.update(more_mints)
+            runs.append(SourceRun("Cielo", True, True, 0, f"seed_mints={len(more_mints)}"))
+        except Exception as e:
+            runs.append(SourceRun("Cielo", True, False, 0, f"{type(e).__name__}: {e}"))
+    else:
+        runs.append(SourceRun("Cielo", False, False, 0, "disabled or credentials unavailable"))
+
+    if not args.no_birdeye and os.getenv("BIRDEYE_API_KEY"):
+        try:
+            rows, more_mints = birdeye_seed_mints()
+            groups.append(rows)
+            mints.update(more_mints)
+            runs.append(SourceRun("Birdeye", True, True, len(rows), f"seed_mints={len(more_mints)}"))
+        except Exception as e:
+            runs.append(SourceRun("Birdeye", True, False, 0, f"{type(e).__name__}: {e}"))
+    else:
+        runs.append(SourceRun("Birdeye", False, False, 0, "disabled or credentials unavailable"))
+
+    run_source(
+        "Solana Tracker",
+        not args.no_solanatracker and bool(os.getenv("SOLANATRACKER_API_KEY")) and bool(mints),
+        lambda: solanatracker_candidates(sorted(mints)[:50]),
+    )
+    run_source(
+        "Nansen",
+        not args.no_nansen and bool(os.getenv("NANSEN_API_KEY")),
+        nansen_candidates,
+    )
+    run_source(
+        "Bitquery",
+        not args.no_bitquery
+        and bool(os.getenv("BITQUERY_API_KEY") or os.getenv("BITQUERY_TOKEN"))
+        and bool(mints),
+        lambda: bitquery_candidates(sorted(mints)[:50]),
+    )
+    run_source(
+        "Codex/Axiom/Defined",
+        not args.no_codex and bool(os.getenv("CODEX_API_KEY")),
+        codex_candidates,
+    )
+    run_source(
+        "GMGN",
+        not args.no_gmgn and shutil.which("gmgn-cli") is not None,
+        gmgn_candidates,
+    )
+
+    if args.degenradar_json:
+        run_source(
+            "DegenRadar",
+            Path(args.degenradar_json).exists(),
+            lambda: json_bridge(args.degenradar_json, "DegenRadar"),
+        )
+    for spec in args.extra_json:
+        source, pth = spec.split("=", 1)
+        run_source(source, Path(pth).exists(), lambda p=pth, s=source: json_bridge(p, s))
+
+    wallets = merge(groups)
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "purpose": "live/broad candidate discovery; never use live-only evidence as proof in historical freezes",
+        "historical_backfill_allowed": False,
+        "sources": [asdict(x) for x in runs],
+        "seed_mint_count": len(mints),
+        "unique_wallet_count": len(wallets),
+        "wallets": wallets,
+    }
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(
+        f"UNIQUE_WALLETS={len(wallets)} "
+        f"SOURCES_OK={sum(x.ok for x in runs)} "
+        f"SEED_MINTS={len(mints)}"
+    )
+    for x in runs:
+        print(f"{x.source}: enabled={x.enabled} ok={x.ok} count={x.count} {x.reason}")
+    print(f"WROTE={out}")
+
+
+if __name__ == "__main__":
+    main()
