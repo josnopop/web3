@@ -7,7 +7,9 @@ from multi_source_discovery import (
     _walk_mints,
     _walk_wallets,
     bitquery_candidates,
+    cielo_seed_mints,
     codex_candidates,
+    dexscreener_seed_mints,
     merge,
 )
 
@@ -64,6 +66,21 @@ class MultiSourceDiscoveryTests(unittest.TestCase):
             {"Codex Wallet Filter", "Axiom via Codex", "Defined via Codex"},
         )
         self.assertEqual(req.call_count, 3)
+
+    @patch("multi_source_discovery._request_json")
+    def test_dexscreener_solana_seed_mints(self, req):
+        req.side_effect = [
+            [{"chainId": "solana", "tokenAddress": MINT}, {"chainId": "ethereum", "tokenAddress": W1}],
+            [], [], []
+        ]
+        self.assertEqual(dexscreener_seed_mints(), {MINT})
+        self.assertEqual(req.call_count, 4)
+
+    @patch.dict(os.environ, {"CIELO_API_KEY": "test"}, clear=True)
+    @patch("multi_source_discovery._request_json")
+    def test_cielo_seed_mints(self, req):
+        req.return_value = {"data": [{"token": {"mint": MINT}}]}
+        self.assertEqual(cielo_seed_mints(), {MINT})
 
     @patch.dict(os.environ, {"BITQUERY_TOKEN": "ory_test"}, clear=True)
     @patch("multi_source_discovery._request_json")
