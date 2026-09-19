@@ -4,9 +4,9 @@ import argparse
 import csv
 import json
 import re
-import time
 import urllib.request
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 BASE = "https://uwuu.ai/trader/"
@@ -14,16 +14,16 @@ ADDR_RE = re.compile(r"/trader/([1-9A-HJ-NP-Za-km-z]{32,44})")
 SNAPSHOT = "refreshed Sep 15, 2026"
 
 
-def fetch(url: str, timeout: int = 25) -> str:
+def fetch_profile(address: str, timeout: int = 15) -> tuple[str, str]:
     req = urllib.request.Request(
-        url,
+        BASE + address,
         headers={
             "User-Agent": "Mozilla/5.0 (compatible; SOL-Wallet-Research/0.3)",
             "Accept": "text/html,application/xhtml+xml",
         },
     )
     with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read().decode("utf-8", errors="ignore")
+        return address, r.read().decode("utf-8", errors="ignore")
 
 
 def textify(html: str) -> str:
@@ -45,7 +45,7 @@ def first_num(pattern: str, text: str, default=None):
         return default
 
 
-def parse_profile(address: str, html: str) -> dict:
+def parse_profile(address: str, html: str) -> tuple[dict, list[str]]:
     txt = textify(html)
     historical = SNAPSHOT.lower() in txt.lower()
 
@@ -54,24 +54,25 @@ def parse_profile(address: str, html: str) -> dict:
     if m:
         title = textify(m.group(1)).replace("— Solana Wallet", "").strip()
 
-    pnl = first_num(r"30d\s*PnL\s*\$?([+-]?[\d,]+(?:\.\d+)?)", txt)
-    roi = first_num(r"30d\s*ROI\s*([+-]?[\d,]+(?:\.\d+)?)\s*%", txt)
-    trades = first_num(r"Trades\s*([\d,]+)", txt)
-    wr = first_num(r"Win rate\s*([\d.]+)\s*%", txt)
-    tokens = first_num(r"Tokens traded\s*([\d,]+)", txt)
-
-    return {
+    row = {
         "name": title or address[:6] + "…" + address[-4:],
         "address": address,
         "snapshot": "2026-09-15" if historical else None,
-        "pnl_usd_30d": pnl,
-        "roi_30d_pct": roi,
-        "trades_30d": int(trades) if trades is not None else None,
-        "win_rate_30d_pct": wr,
-        "tokens_30d": int(tokens) if tokens is not None else None,
+        "pnl_usd_30d": first_num(r"30d\s*PnL\s*\$?([+-]?[\d,]+(?:\.\d+)?)", txt),
+        "roi_30d_pct": first_num(r"30d\s*ROI\s*([+-]?[\d,]+(?:\.\d+)?)\s*%", txt),
+        "trades_30d": first_num(r"Trades\s*([\d,]+)", txt),
+        "win_rate_30d_pct": first_num(r"Win rate\s*([\d.]+)\s*%", txt),
+        "tokens_30d": first_num(r"Tokens traded\s*([\d,]+)", txt),
         "source": "uwuu historical profile snapshot",
         "kol_bonus": 0,
     }
+    if row["trades_30d"] is not None:
+        row["trades_30d"] = int(row["trades_30d"])
+    if row["tokens_30d"] is not None:
+        row["tokens_30d"] = int(row["tokens_30d"])
+
+    links = list(dict.fromkeys(ADDR_RE.findall(html)))
+    return row, links
 
 
 def gate(row: dict) -> tuple[bool, list[str]]:
@@ -101,14 +102,13 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--seed-file", default="frozen_wallets_2026_09_15.json")
     p.add_argument("--max-profiles", type=int, default=500)
-    p.add_argument("--sleep", type=float, default=0.20)
+    p.add_argument("--workers", type=int, default=20)
+    p.add_argument("--batch-size", type=int, default=40)
     p.add_argument("--out", default="out/2026-09-15/historical_candidates.json")
     args = p.parse_args()
 
     seed = json.loads(Path(args.seed_file).read_text(encoding="utf-8"))
     q = deque(w["address"] for w in seed["wallets"])
-
-    # Extra Sep-15 profiles independently surfaced by historical web indexing.
     q.extend([
         "EaVboaPxFCYanjoNWdkxTbPvt57nhXGu5i6m9m6ZS2kK",
         "4s2WzRLa35FB58bZY1i4CN3WoywJeuYrGYHnTKFsT23z",
@@ -117,30 +117,43 @@ def main():
         "AeLaMjzxErZt4drbWVWvcxpVyo8p94xu5vrg41eZPFe3",
     ])
 
-    seen = set()
-    rows = []
-    errors = []
+    seen: set[str] = set()
+    queued = set(q)
+    rows: list[dict] = []
+    errors: list[dict] = []
 
-    while q and len(seen) < args.max_profiles:
-        addr = q.popleft()
-        if addr in seen:
-            continue
-        seen.add(addr)
-        try:
-            html = fetch(BASE + addr)
-            row = parse_profile(addr, html)
-            ok, reasons = gate(row)
-            row["pre_filter_pass"] = ok
-            row["reject_reasons"] = reasons
-            rows.append(row)
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:
+        while q and len(seen) < args.max_profiles:
+            batch = []
+            while q and len(batch) < args.batch_size and len(seen) + len(batch) < args.max_profiles:
+                addr = q.popleft()
+                if addr in seen:
+                    continue
+                seen.add(addr)
+                batch.append(addr)
 
-            for found in ADDR_RE.findall(html):
-                if found not in seen:
-                    q.append(found)
-        except Exception as e:
-            errors.append({"address": addr, "error": f"{type(e).__name__}: {e}"})
-        if args.sleep:
-            time.sleep(args.sleep)
+            futs = {pool.submit(fetch_profile, addr): addr for addr in batch}
+            for fut in as_completed(futs):
+                addr = futs[fut]
+                try:
+                    _, html = fut.result()
+                    row, links = parse_profile(addr, html)
+                    ok, reasons = gate(row)
+                    row["pre_filter_pass"] = ok
+                    row["reject_reasons"] = reasons
+                    rows.append(row)
+
+                    for found in links:
+                        if found not in seen and found not in queued and len(queued) < args.max_profiles * 4:
+                            q.append(found)
+                            queued.add(found)
+                except Exception as e:
+                    errors.append({"address": addr, "error": f"{type(e).__name__}: {e}"})
+
+            print(
+                f"BATCH_DONE fetched={len(batch)} total_profiles={len(rows)} "
+                f"queue={len(q)} accepted_so_far={sum(1 for r in rows if r['pre_filter_pass'])}"
+            )
 
     accepted = [r for r in rows if r["pre_filter_pass"]]
     accepted.sort(
