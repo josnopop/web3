@@ -49,6 +49,64 @@
       "address": "BQVz7fQ1WsQmSTMY3umdPEPPTm1sdcBcX9sP7o6kPRmB",
       "historical_seen": "2026-09-13",
       "source": "MadeOnSol historical daily alpha"
+    },
+    {
+      "name": "big bags bobby",
+      "address": "8oQoMhfBQnRspn7QtNAq2aPThRE4q94kLSTwaaFQvRgs",
+      "historical_seen": "2026-09-12",
+      "historical_pnl_usd_30d": 70415,
+      "source": "uwuu Sep12 Maze historical similar-wallet snapshot",
+      "status": "candidate_only"
+    },
+    {
+      "name": "Stacker",
+      "address": "HbCxe8yWQJWnK3f3FX4oohgm87FZuPYD4Ydszqxgkwft",
+      "historical_seen": "2026-09-12",
+      "historical_pnl_usd_30d": 69310,
+      "source": "uwuu Sep12 Maze historical similar-wallet snapshot",
+      "status": "candidate_only",
+      "note": "extreme single-winner concentration; likely Non-copyable Alpha"
+    },
+    {
+      "name": "5ZuV…qbdg",
+      "address": "5ZuV8eqkvzYFVEKbLvGBdexL2tFv7E5BCd2HZpjqbdg",
+      "historical_seen": "2026-09-12",
+      "historical_pnl_usd_30d": 69214,
+      "source": "uwuu Sep12 Maze historical similar-wallet snapshot",
+      "status": "candidate_only"
+    },
+    {
+      "name": "Tuults",
+      "address": "5T229oePmJGE5Cefys8jE9Jq8C7qfGNNWy3RVA7SmwEP",
+      "historical_seen": "2026-09-12",
+      "historical_pnl_usd_30d": 67254,
+      "source": "uwuu Sep12 Maze historical similar-wallet snapshot",
+      "status": "candidate_only"
+    },
+    {
+      "name": "Meechie",
+      "address": "9iaawVBEsFG35PSwd4PahwT8fYNQe9XYuRdWm872dUqY",
+      "historical_seen": "2026-09-12",
+      "historical_pnl_usd_30d": 66722,
+      "source": "uwuu Sep12 Maze historical similar-wallet snapshot",
+      "status": "candidate_only"
+    },
+    {
+      "name": "Lynk",
+      "address": "CkPFGv2Wv1vwdWjtXioEgb8jhZQfs3eVZez3QCetu7xD",
+      "historical_seen": "2026-09-12",
+      "historical_pnl_usd_30d": 66260,
+      "source": "uwuu Sep12 Maze historical similar-wallet snapshot",
+      "status": "candidate_only"
+    },
+    {
+      "name": "Rilsio",
+      "address": "4fZFcK8ms3bFMpo1ACzEUz8bH741fQW4zhAMGd5yZMHu",
+      "historical_seen": "2026-09-12",
+      "historical_pnl_usd_30d": 62024,
+      "source": "uwuu Sep12 Maze historical similar-wallet snapshot",
+      "status": "candidate_only"
     }
-  ]
+  ],
+  "candidate_count": 15
 }
