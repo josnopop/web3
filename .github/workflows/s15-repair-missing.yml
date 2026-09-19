@@ -1,0 +1,31 @@
+name: s15-repair-missing
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths: [".github/workflows/s15-repair-missing.yml"]
+  workflow_dispatch:
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: s15-heavy-*
+          path: sol-alpha-wallet-discovery/in
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          run-id: 35443781846
+      - name: Repair all error signatures
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          mkdir -p out/s15_repair
+          for f in in/*.json; do
+            n=$(basename "$f" .json)
+            python s15_repair_errors.py --input "$f" --out "out/s15_repair/${n}_repair.json"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s15-repaired-errors
+          path: sol-alpha-wallet-discovery/out/s15_repair/*.json
