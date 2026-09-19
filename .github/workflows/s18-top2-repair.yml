@@ -1,0 +1,24 @@
+name: s18-top2-repair
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths: [".github/workflows/s18-top2-repair.yml"]
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: s18-top5-1
+          path: sol-alpha-wallet-discovery/out
+          run-id: 35446007046
+          github-token: ${{ github.token }}
+      - name: Repair
+        working-directory: sol-alpha-wallet-discovery
+        run: python s15_repair_errors.py --input out/shard_1.json --out out/repaired.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s18-top2-repaired
+          path: sol-alpha-wallet-discovery/out/repaired.json
