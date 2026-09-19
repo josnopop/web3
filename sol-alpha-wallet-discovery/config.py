@@ -10,8 +10,11 @@ USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 USDT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 QUOTE_MINTS = {WSOL, USDC, USDT}
 
+# Official Pump.fun bonding-curve program id from pump-fun/pump-public-docs.
+PUMPFUN_PROGRAM_ID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+
 DEX_PROGRAM_IDS = {
-    "6EF8rrecthR5Dkzf5NzcraK8xtoqf2QvF6C4Zss5F6P",  # Pump.fun
+    PUMPFUN_PROGRAM_ID,  # Pump.fun bonding curve
     "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",  # PumpSwap
     "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",  # Jupiter v6
     "675kPX9MHTjS2zt1qfr1NYHuzeP4f4VgFkZyJgB9wCt",  # Raydium AMM v4
@@ -20,7 +23,7 @@ DEX_PROGRAM_IDS = {
     "whirLbMiicVdio4qvUfM5KAg6CtB8VDbQ8tX1YDPJ2",  # Orca Whirlpools
 }
 
-SCORING_VERSION = "wallet-score-v0.3.0"
+SCORING_VERSION = "wallet-score-v0.3.1-pump-id-fix"
 
 
 def utc_window_for_local_day(day: date) -> tuple[datetime, datetime]:
