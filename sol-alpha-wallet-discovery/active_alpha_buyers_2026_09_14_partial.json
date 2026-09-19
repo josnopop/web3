@@ -1,0 +1,27 @@
+{
+  "freeze_cutoff_utc": "2026-09-13T16:00:00Z",
+  "replay_date": "2026-09-14",
+  "partial": true,
+  "wallets": [
+    {
+      "wallet": "BakXJNBFe4wnXjSHTRPiT5cw33vqsBehgnLouLxLhfyz",
+      "score": null,
+      "source": "Sep14 replay active buyer"
+    },
+    {
+      "wallet": "zs6AGzbamkwsdLYDe35iXudVJ3zs7tZbHxwC6ZPdfG4",
+      "score": 46.377,
+      "source": "Sep14 replay active buyer"
+    },
+    {
+      "wallet": "7b9w4xvcriw6BiBcoLqKRjj4tE7V8xJZT4twoKRVaMpp",
+      "score": null,
+      "source": "Sep14 replay active buyer"
+    },
+    {
+      "wallet": "HRtVPhj4FoGobHB1aTbsgVrDk1AMQLC27iLBYKsB3W5X",
+      "score": null,
+      "source": "Sep14 replay active buyer"
+    }
+  ]
+}
