@@ -1,0 +1,41 @@
+name: s15-heavy-partition
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s15-heavy-partition.yml"
+  workflow_dispatch:
+jobs:
+  replay:
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        include:
+          - {shard: 4, part: 0}
+          - {shard: 4, part: 1}
+          - {shard: 4, part: 2}
+          - {shard: 4, part: 3}
+          - {shard: 4, part: 4}
+          - {shard: 4, part: 5}
+          - {shard: 9, part: 0}
+          - {shard: 9, part: 1}
+          - {shard: 9, part: 2}
+          - {shard: 9, part: 3}
+          - {shard: 9, part: 4}
+          - {shard: 9, part: 5}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: Replay heavy partition
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          mkdir -p out/s15_heavy
+          python s_quote_replay.py --pool s_simple12_2026_09_19.json --date 2026-09-15 --shard ${{ matrix.shard }} --part ${{ matrix.part }} --parts 6 --out out/s15_heavy/shard_${{ matrix.shard }}_part_${{ matrix.part }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s15-heavy-${{ matrix.shard }}-${{ matrix.part }}
+          path: sol-alpha-wallet-discovery/out/s15_heavy/*.json
