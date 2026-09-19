@@ -4,10 +4,6 @@ on:
     branches: [feat/wallet-discovery-v03]
     paths:
       - ".github/workflows/s-historical-elite-v2.yml"
-      - "sol-alpha-wallet-discovery/s_historical_elite_2026_09_19.json"
-      - "sol-alpha-wallet-discovery/s_fast7_filter.py"
-      - "sol-alpha-wallet-discovery/history_rescore.py"
-      - "sol-alpha-wallet-discovery/build_wallet_history_cache.py"
   workflow_dispatch:
 
 concurrency:
@@ -15,55 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0,1,2,3,4,5,6,7]
+  retired:
+    if: ${{ false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Validate elite candidate over 7d
-        working-directory: sol-alpha-wallet-discovery
-        run: |
-          python build_wallet_history_cache.py \
-            --candidates s_historical_elite_2026_09_19.json \
-            --start-date 2026-09-12 --end-date 2026-09-19 \
-            --shard ${{ matrix.shard }} --shards 8 --pages 8 \
-            --out out/s_elite/shard_${{ matrix.shard }}.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: s-elite-${{ matrix.shard }}
-          path: sol-alpha-wallet-discovery/out/s_elite/shard_${{ matrix.shard }}.json
-          if-no-files-found: error
-
-  qualify:
-    needs: validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: s-elite-*
-          path: sol-alpha-wallet-discovery/out/s_elite
-          merge-multiple: true
-      - name: 7d freshness + 7d S qualification
-        working-directory: sol-alpha-wallet-discovery
-        run: |
-          python s_fast7_filter.py \
-            --cache out/s_elite \
-            --cutoff-date 2026-09-19 \
-            --out out/s_elite/S_WALLETS_FAST7.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: S-HISTORICAL-ELITE-FAST7
-          path: sol-alpha-wallet-discovery/out/s_elite/
-          if-no-files-found: error
+      - run: echo "retired; current priority is 24h S-wallet simulation"
