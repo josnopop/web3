@@ -4,6 +4,8 @@ on:
     branches: [feat/wallet-discovery-v03]
     paths:
       - ".github/workflows/discover-2026-09-13-v04.yml"
+      - "sol-alpha-wallet-discovery/discover_walkforward_candidates.py"
+      - "sol-alpha-wallet-discovery/requirements.txt"
   workflow_dispatch:
 jobs:
   discover:
