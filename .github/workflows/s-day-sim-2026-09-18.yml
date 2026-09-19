@@ -6,6 +6,10 @@ on:
       - ".github/workflows/s-day-sim-2026-09-18.yml"
   workflow_dispatch:
 
+concurrency:
+  group: s-day-sim-2026-09-18-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   simulate:
     runs-on: ubuntu-latest
