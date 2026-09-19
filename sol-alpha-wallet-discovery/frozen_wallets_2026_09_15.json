@@ -1,12 +1,13 @@
 {
-  "freeze_label": "2026-09-15 strict verified pool v3",
+  "freeze_label": "2026-09-15 strict verified pool v4",
   "replay_day_local": "2026-09-16",
   "timezone": "UTC+8",
   "rules": {
     "cutoff": "2026-09-15T23:59:59+08:00",
     "no_hindsight": true,
     "kol_bonus": 0,
-    "note": "Candidates added only from historical snapshots available by the Sep-15 cutoff."
+    "note": "Candidates added only from historical snapshots available by the Sep-15 cutoff.",
+    "wallet_count": 36
   },
   "wallets": [
     {
@@ -179,6 +180,104 @@
       "trades_30d": 80,
       "pnl_usd_30d": 184788,
       "note": "Radar/anomaly: 100% WR; do not treat as automatically copyable"
+    },
+    {
+      "name": "Clown",
+      "address": "EDXHdSFdadFbYFFjxPXBqMe1kCEDFqpPu552uvp48HR8",
+      "snapshot": "2026-09-13",
+      "wallet_class_hint": "Copyable Wallet",
+      "wr_30d": 0.828,
+      "roi_30d": 1.383,
+      "trades_30d": 1780,
+      "pnl_usd_30d": 161465,
+      "note": "strong broad sample; top1 concentration still checked before direct copy"
+    },
+    {
+      "name": "Kadenox",
+      "address": "B32QbbdDAyhvUQzjcaM5j6ZVKwjCxAwGH5Xgvb9SJqnC",
+      "snapshot": "2026-09-15",
+      "wallet_class_hint": "Copyable Wallet",
+      "wr_30d": 0.882,
+      "roi_30d": 1.135,
+      "trades_30d": 1543,
+      "pnl_usd_30d": 90341,
+      "note": "high WR; bot/speed checks still required"
+    },
+    {
+      "name": "Risk",
+      "address": "BHREKFkPQgAtDs8Vb1UfLkUpjG6ScidTjHaCWFuG2AtX",
+      "snapshot": "2026-09-15",
+      "wallet_class_hint": "Confirmation Wallet",
+      "wr_30d": 0.778,
+      "roi_30d": 4.397,
+      "trades_30d": 311,
+      "pnl_usd_30d": 167207,
+      "note": "very high profit concentration; confirmation only unless concentration passes"
+    },
+    {
+      "name": "Jidn",
+      "address": "3h65MmPZksoKKyEpEjnWU2Yk2iYT5oZDNitGy5cTaxoE",
+      "snapshot": "2026-09-12",
+      "wallet_class_hint": "Confirmation Wallet",
+      "wr_30d": 0.533,
+      "roi_30d": 0.822,
+      "trades_30d": 1197,
+      "pnl_usd_30d": 125974,
+      "note": "positive expectancy but lower hit rate"
+    },
+    {
+      "name": "deecayz",
+      "address": "Dv32u9mvSXGVNshf7xM7afuMoPRifQxzuzEjfmfMysZY",
+      "snapshot": "2026-09-14",
+      "wallet_class_hint": "Non-copyable Alpha",
+      "wr_30d": 0.545,
+      "roi_30d": 0.888,
+      "trades_30d": 302,
+      "pnl_usd_30d": 151551,
+      "note": "returns heavily concentrated in one winner; use as signal confirmation"
+    },
+    {
+      "name": "narc",
+      "address": "CxgPWvH2GoEDENELne2XKAR2z2Fr4shG2uaeyqZceGve",
+      "snapshot": "2026-09-15",
+      "wallet_class_hint": "Confirmation Wallet",
+      "wr_30d": 0.603,
+      "roi_30d": 0.92,
+      "trades_30d": 1160,
+      "pnl_usd_30d": 233494,
+      "note": "broad sample; concentration check required"
+    },
+    {
+      "name": "Johnson",
+      "address": "J9TYAsWWidbrcZybmLSfrLzryANf4CgJBLdvwdGuC8MB",
+      "snapshot": "2026-09-14",
+      "wallet_class_hint": "Non-copyable Alpha",
+      "wr_30d": 0.452,
+      "roi_30d": 0.443,
+      "trades_30d": 6369,
+      "pnl_usd_30d": 190606,
+      "note": "extreme activity; signal/confirmation use, not blind copying"
+    },
+    {
+      "name": "EqiF…r1Zb",
+      "address": "EqiFgyNw6kgrmYstWyrP8VjKhka7XEmKTZzHSmwpr1Zb",
+      "snapshot": "2026-09-15",
+      "wallet_class_hint": "Non-copyable Alpha",
+      "wr_30d": 0.6,
+      "roi_30d": 0.575,
+      "trades_30d": 8040,
+      "pnl_usd_30d": 160900,
+      "note": "extreme activity; signal/confirmation use"
+    },
+    {
+      "name": "Rayan",
+      "address": "BNahnx13rLru9zxuWNGBD7vVv1pGQXB11Q7qeTyupdWf",
+      "snapshot": "2026-09-08",
+      "wallet_class_hint": "Non-copyable Alpha",
+      "wr_30d": 0.4571,
+      "trades_30d": 5153,
+      "pnl_usd_30d": 670067,
+      "note": "very high frequency and sub-50% hit rate; confirmation only"
     }
   ]
 }
