@@ -15,6 +15,10 @@ on:
       - "sol-alpha-wallet-discovery/requirements.txt"
       - ".github/workflows/wallet-discovery-tests.yml"
 
+concurrency:
+  group: wallet-discovery-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unit:
     runs-on: ubuntu-latest
