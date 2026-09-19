@@ -2,7 +2,7 @@ name: s18-active-candidates-replay
 on:
   push:
     branches: [feat/wallet-discovery-v03]
-    paths: [".github/workflows/s18-active-candidates-replay.yml"]
+    paths: [".github/workflows/s18-active-candidates-replay.yml", "sol-alpha-wallet-discovery/active_candidates_2026_09_18.json"]
 jobs:
  replay:
   strategy:
