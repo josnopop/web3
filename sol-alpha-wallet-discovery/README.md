@@ -76,8 +76,12 @@ Live/broad wallet discovery now merges independent evidence from every supported
 - Solana DEX chain scan / public RPC
 - OKX Onchain Smart Money leaderboard (smart money, whale, new wallet, sniper, Pump smart money)
 - Solana Tracker token Top Traders
+- DEX Screener Solana token profiles / boosts as no-key token seeds
+- Cielo Solana trending-token seeds
 - Birdeye Smart Money token seeds
 - Nansen Smart Money DEX trades
+- Arkham Intel Solana token-holder expansion
+- Dune configured wallet-discovery query results
 - Codex wallet filters, including Axiom and Defined trade-source views
 - Bitquery Solana token Top Traders
 - GMGN CLI and DegenRadar JSON bridge
@@ -91,7 +95,8 @@ Historical/chain backends:
 Credentials are read only from environment variables:
 `OKX_API_KEY`, `OKX_SECRET_KEY`, `OKX_API_PASSPHRASE`, optional `OKX_PROJECT_ID`,
 `SOLANATRACKER_API_KEY`, `BIRDEYE_API_KEY`, `NANSEN_API_KEY`,
-`CODEX_API_KEY`, `BITQUERY_TOKEN` (or `BITQUERY_API_KEY`), `HELIUS_API_KEY`.
+`CODEX_API_KEY`, `BITQUERY_TOKEN` (or `BITQUERY_API_KEY`), `HELIUS_API_KEY`,
+`CIELO_API_KEY`, `ARKHAM_API_KEY`, `DUNE_API_KEY` + comma-separated `DUNE_QUERY_IDS`.
 
 Example:
 
