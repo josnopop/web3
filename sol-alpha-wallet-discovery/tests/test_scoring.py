@@ -1,7 +1,7 @@
 import unittest
 from datetime import date, timezone
 
-from config import utc_window_for_local_day
+from config import DEX_PROGRAM_IDS, PUMPFUN_PROGRAM_ID, utc_window_for_local_day
 from scoring import WalletFeatures, WindowMetrics, freeze_snapshot, score_wallet
 from source_bridge import SourceCandidate, merge_candidates
 
@@ -54,6 +54,11 @@ class WalletScoringTests(unittest.TestCase):
         row = merged["11111111111111111111111111111111"]
         self.assertEqual(row["bonus"], 0.0)
         self.assertEqual(row["source_count"], 2)
+
+    def test_official_pumpfun_program_id_is_locked(self):
+        official = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+        self.assertEqual(PUMPFUN_PROGRAM_ID, official)
+        self.assertIn(official, DEX_PROGRAM_IDS)
 
 
 if __name__ == "__main__":
