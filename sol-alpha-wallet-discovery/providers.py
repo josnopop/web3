@@ -85,6 +85,18 @@ def detect_sources() -> list[DataSourceStatus]:
             "Solana smart-money DEX-trade adapter",
         ),
         DataSourceStatus(
+            "Arkham Intel",
+            bool(os.getenv("ARKHAM_API_KEY")),
+            Coverage.LIVE_ONLY,
+            "Solana token-holder/entity intelligence adapter",
+        ),
+        DataSourceStatus(
+            "Dune",
+            bool(os.getenv("DUNE_API_KEY") and os.getenv("DUNE_QUERY_IDS")),
+            Coverage.LIVE_ONLY,
+            "configured query-results wallet adapter",
+        ),
+        DataSourceStatus(
             "Codex / Defined / Axiom trade-source views",
             bool(os.getenv("CODEX_API_KEY")),
             Coverage.LIVE_ONLY,
