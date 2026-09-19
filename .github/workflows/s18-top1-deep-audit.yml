@@ -2,7 +2,7 @@ name: s18-top1-deep-audit
 on:
   push:
     branches: [feat/wallet-discovery-v03]
-    paths: [".github/workflows/s18-top1-deep-audit.yml"]
+    paths: [".github/workflows/s18-top1-deep-audit.yml", "sol-alpha-wallet-discovery/top1_deep_audit.py"]
 jobs:
  audit:
   runs-on: ubuntu-latest
