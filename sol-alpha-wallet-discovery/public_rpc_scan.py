@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -19,24 +20,43 @@ class SignatureRow:
     slot: int
 
 
-def rpc_call(method: str, params: list, url: str = DEFAULT_RPC, timeout: int = 30):
+def rpc_call(method: str, params: list, url: str = DEFAULT_RPC, timeout: int = 30, retries: int = 6):
     payload = json.dumps({
         "jsonrpc": "2.0",
         "id": 1,
         "method": method,
         "params": params,
     }).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={"content-type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        body = json.loads(r.read().decode("utf-8"))
-    if "error" in body:
-        raise RuntimeError(f"RPC {method} error: {body['error']}")
-    return body.get("result")
+    last = None
+    for attempt in range(retries):
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"content-type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                body = json.loads(r.read().decode("utf-8"))
+            if "error" in body:
+                raise RuntimeError(f"RPC {method} error: {body['error']}")
+            return body.get("result")
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code != 429 or attempt == retries - 1:
+                raise
+            retry_after = e.headers.get("Retry-After")
+            wait = float(retry_after) if retry_after else min(2 ** attempt, 20)
+            print(f"[rpc] 429 on {method}; retry {attempt + 1}/{retries} in {wait}s")
+            time.sleep(wait)
+        except (urllib.error.URLError, TimeoutError) as e:
+            last = e
+            if attempt == retries - 1:
+                raise
+            wait = min(2 ** attempt, 20)
+            print(f"[rpc] transient {type(e).__name__}; retry in {wait}s")
+            time.sleep(wait)
+    raise RuntimeError(f"RPC failed: {last}")
 
 
 def iter_signatures(
@@ -46,13 +66,8 @@ def iter_signatures(
     *,
     max_pages: int = 3,
     rpc_url: str = DEFAULT_RPC,
-    sleep_s: float = 0.25,
+    sleep_s: float = 0.8,
 ) -> Iterable[SignatureRow]:
-    """Exact-timestamp but bounded public-RPC fallback.
-
-    This is intentionally coverage-limited. It is useful for verification and
-    targeted historical recovery, not for claiming exhaustive market coverage.
-    """
     before = None
     for _ in range(max_pages):
         opts = {"limit": 1000}
@@ -110,7 +125,7 @@ def probe(address: str, start: str, end: str, pages: int, rpc_url: str):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--address", required=True)
-    p.add_argument("--start", required=True, help="UTC ISO, e.g. 2026-09-16T00:00:00")
+    p.add_argument("--start", required=True)
     p.add_argument("--end", required=True)
     p.add_argument("--pages", type=int, default=1)
     p.add_argument("--rpc", default=DEFAULT_RPC)
