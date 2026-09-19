@@ -1,7 +1,13 @@
 {
-  "freeze_label": "2026-09-15 first verified pool",
+  "freeze_label": "2026-09-15 strict verified pool v2",
   "replay_day_local": "2026-09-16",
   "timezone": "UTC+8",
+  "rules": {
+    "cutoff": "2026-09-15T23:59:59+08:00",
+    "no_hindsight": true,
+    "kol_bonus": 0,
+    "note": "Candidates added only from historical snapshots available by the Sep-15 cutoff."
+  },
   "wallets": [
     {
       "name": "Gh0stee",
@@ -63,6 +69,80 @@
     {
       "name": "36A6…kDKG",
       "address": "36A6mEN5rYJdVTb6fMqVvG6ez8g2mTYdr1omWcQ1kDKG"
+    },
+    {
+      "name": "Megga",
+      "address": "H31vEBxSJk1nQdUN11qZgZyhScyShhscKhvhZZU3dQoU",
+      "snapshot": "2026-09-14",
+      "wr_30d": 0.817,
+      "roi_30d": 1.05,
+      "trades_30d": 1213,
+      "pnl_usd_30d": 138621
+    },
+    {
+      "name": "Otta",
+      "address": "As7HjL7dzzvbRbaD3WCun47robib2kmAKRXMvjHkSMB5",
+      "snapshot": "2026-09-14",
+      "wr_30d": 0.929,
+      "roi_30d": 1.307,
+      "trades_30d": 217,
+      "pnl_usd_30d": 39622
+    },
+    {
+      "name": "West",
+      "address": "JDd3hy3gQn2V982mi1zqhNqUw1GfV2UL6g76STojCJPN",
+      "snapshot": "2026-09-12",
+      "wr_30d": 0.783,
+      "roi_30d": 0.243,
+      "trades_30d": 978,
+      "pnl_usd_30d": 87965,
+      "note": "strong but higher concentration/drawdown; keep under concentration check"
+    },
+    {
+      "name": "Gasp",
+      "address": "xyzfhxfy8NhfeNG3Um3WaUvFXzNuHkrhrZMD8dsStB6",
+      "snapshot": "2026-09-12",
+      "wr_30d": 0.694,
+      "roi_30d": 0.541,
+      "trades_30d": 1355,
+      "pnl_usd_30d": 48284
+    },
+    {
+      "name": "blixze",
+      "address": "5vg7he5HibvsAW86wfiuP6jw7VwKmUAnP6P93mVCdpJu",
+      "snapshot": "2026-09-12",
+      "wr_30d": 0.69,
+      "roi_30d": 0.856,
+      "trades_30d": 539,
+      "pnl_usd_30d": 43965
+    },
+    {
+      "name": "Dan",
+      "address": "qNGhUruCGJpXJdsnV74USHErcbm3CrXRsnP8D6Z34Hh",
+      "snapshot": "2026-09-15",
+      "wr_30d": 0.724,
+      "roi_30d": 0.379,
+      "trades_30d": 573,
+      "pnl_usd_30d": 28160
+    },
+    {
+      "name": "Qavec",
+      "address": "gangJEP5geDHjPVRhDS5dTF5e6GtRvtNogMEEVs91RV",
+      "snapshot": "2026-09-15",
+      "wr_30d": 0.616,
+      "roi_30d": 0.303,
+      "trades_30d": 1868,
+      "pnl_usd_30d": 36807
+    },
+    {
+      "name": "k4ye",
+      "address": "5fHJszey2UdB2nETS1y6NS2wSG4ic9byKtbgJzaYzGeV",
+      "snapshot": "2026-09-12",
+      "wr_30d": 1,
+      "roi_30d": 0.66,
+      "trades_30d": 2327,
+      "pnl_usd_30d": 37727,
+      "note": "Radar/anomaly flag: unusually perfect WR; must survive chain recomputation"
     }
   ]
 }
