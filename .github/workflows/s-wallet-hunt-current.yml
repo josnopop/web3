@@ -5,7 +5,7 @@ on:
     paths:
       - ".github/workflows/s-wallet-hunt-current.yml"
       - "sol-alpha-wallet-discovery/s_wallet_filter.py"
-      - "sol-alpha-wallet-discovery/build_s_candidate_pool.py"
+      - "sol-alpha-wallet-discovery/build_s_candidate_pool.py"\n      - "sol-alpha-wallet-discovery/s_fast15_filter.py"
   workflow_dispatch:
 
 jobs:
@@ -52,12 +52,12 @@ jobs:
         with:
           name: s-wallet-candidates
           path: sol-alpha-wallet-discovery/out/s_hunt
-      - name: Build 30d chain history cache
+      - name: Build 15d chain history cache
         working-directory: sol-alpha-wallet-discovery
         run: |
           python build_wallet_history_cache.py \
             --candidates out/s_hunt/s_candidates.json \
-            --start-date 2026-08-20 \
+            --start-date 2026-09-04 \
             --end-date 2026-09-19 \
             --shard ${{ matrix.shard }} --shards 16 \
             --pages 12 \
