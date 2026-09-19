@@ -4,11 +4,15 @@ on:
   push:
     branches: [feat/wallet-discovery-v03]
     paths:
-      - "sol-alpha-wallet-discovery/**"
+      - "sol-alpha-wallet-discovery/**/*.py"
+      - "sol-alpha-wallet-discovery/tests/**"
+      - "sol-alpha-wallet-discovery/requirements.txt"
       - ".github/workflows/wallet-discovery-tests.yml"
   pull_request:
     paths:
-      - "sol-alpha-wallet-discovery/**"
+      - "sol-alpha-wallet-discovery/**/*.py"
+      - "sol-alpha-wallet-discovery/tests/**"
+      - "sol-alpha-wallet-discovery/requirements.txt"
       - ".github/workflows/wallet-discovery-tests.yml"
 
 jobs:
