@@ -7,18 +7,17 @@ from typing import Iterable
 
 
 @dataclass(frozen=True)
-class WalletFeatures:
-    wallet: str
+class WindowMetrics:
+    days: int
     dex_txs: int
     active_days: int
     distinct_tokens: int
-    buys: int
-    sells: int
-    gross_quote_out_sol: float
-    gross_quote_in_sol: float
-    realized_quote_pnl_sol: float
+    realized_pnl_sol: float
     win_tokens: int
     closed_tokens: int
+    median_token_roi: float
+    top1_profit_concentration: float
+    top3_profit_concentration: float
     median_hold_minutes: float
     rug_like_tokens: int
     same_slot_ratio: float
@@ -26,15 +25,35 @@ class WalletFeatures:
 
 
 @dataclass(frozen=True)
+class WalletFeatures:
+    wallet: str
+    w7: WindowMetrics
+    w15: WindowMetrics
+    w30: WindowMetrics
+    source_count: int = 1
+    early_entry: float | None = None
+    alpha_decay: float | None = None
+    entry_skill: float | None = None
+    hold_skill: float | None = None
+    exit_quality: float | None = None
+    external_data_confidence: float | None = None
+
+
+@dataclass(frozen=True)
 class WalletScore:
     wallet: str
     score: float
     tier: str
-    copyable_pnl_sol: float
-    win_rate: float
-    rug_exposure: float
-    sample_quality: float
-    hft_penalty: float
+    wallet_class: str
+    pnl_30d_sol: float
+    win_rate_7d: float
+    win_rate_15d: float
+    win_rate_30d: float
+    median_roi_30d: float
+    top1_concentration: float
+    top3_concentration: float
+    copyability: float
+    data_confidence: float
     notes: tuple[str, ...]
 
 
@@ -42,74 +61,108 @@ def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, x))
 
 
+def _wr(w: WindowMetrics) -> float:
+    return w.win_tokens / max(w.closed_tokens, 1)
+
+
 def score_wallet(f: WalletFeatures) -> WalletScore:
-    closed = max(f.closed_tokens, 1)
-    win_rate = f.win_tokens / closed
-    rug_exposure = f.rug_like_tokens / max(f.distinct_tokens, 1)
+    w7, w15, w30 = f.w7, f.w15, f.w30
+    wr7, wr15, wr30 = _wr(w7), _wr(w15), _wr(w30)
 
-    # Sample quality rewards sustained activity but saturates; raw HFT volume is not alpha.
-    sample_quality = _clamp(f.closed_tokens / 30.0) * _clamp(f.active_days / 10.0)
-    pnl_quality = _clamp((f.realized_quote_pnl_sol + 5.0) / 25.0)
-    win_quality = _clamp((win_rate - 0.35) / 0.35)
-    hold_quality = 1.0 - _clamp(abs(f.median_hold_minutes - 45.0) / 240.0)
-    diversity = _clamp(f.distinct_tokens / 40.0)
+    pnl_quality = _clamp((w30.realized_pnl_sol + 5.0) / 35.0)
+    win_quality = _clamp((0.45 * wr7 + 0.25 * wr15 + 0.30 * wr30 - 0.35) / 0.40)
+    median_roi_quality = _clamp((w30.median_token_roi + 0.10) / 0.90)
+    sample_quality = _clamp(w30.closed_tokens / 30.0) * _clamp(w30.active_days / 12.0)
 
-    # Penalize machine-gun flow, same-slot/bundle-like behavior and rug exposure.
-    hft_penalty = _clamp((f.max_trades_per_minute - 8) / 35.0)
-    cluster_penalty = _clamp((f.same_slot_ratio - 0.10) / 0.50)
-    rug_penalty = _clamp(rug_exposure / 0.25)
+    concentration_penalty = 0.55 * _clamp((w30.top1_profit_concentration - 0.35) / 0.55)
+    concentration_penalty += 0.45 * _clamp((w30.top3_profit_concentration - 0.70) / 0.30)
+
+    hft_penalty = _clamp((w30.max_trades_per_minute - 8) / 42.0)
+    cluster_penalty = _clamp((w30.same_slot_ratio - 0.10) / 0.50)
+    hold_copy = 1.0 - _clamp((5.0 - w30.median_hold_minutes) / 5.0) if w30.median_hold_minutes < 5 else 1.0
+    copyability = _clamp(hold_copy * (1 - 0.60 * hft_penalty) * (1 - 0.55 * cluster_penalty))
+
+    rug_exposure = w30.rug_like_tokens / max(w30.distinct_tokens, 1)
+    risk_penalty = _clamp(rug_exposure / 0.25)
+
+    source_conf = _clamp(f.source_count / 3.0)
+    data_confidence = _clamp(
+        0.70 * sample_quality
+        + 0.20 * source_conf
+        + 0.10 * (f.external_data_confidence or 0.0)
+    )
+
+    optional_alpha = [
+        x for x in (f.early_entry, f.entry_skill, f.hold_skill, f.exit_quality)
+        if x is not None
+    ]
+    alpha_quality = sum(optional_alpha) / len(optional_alpha) if optional_alpha else 0.50
+    decay_quality = 1.0 - _clamp(f.alpha_decay or 0.0)
 
     raw = (
-        30.0 * pnl_quality
-        + 20.0 * win_quality
-        + 15.0 * sample_quality
-        + 10.0 * hold_quality
-        + 10.0 * diversity
-        + 15.0 * _clamp((f.realized_quote_pnl_sol + 2.0) / 12.0)
-        - 20.0 * hft_penalty
-        - 15.0 * cluster_penalty
-        - 25.0 * rug_penalty
+        23 * pnl_quality
+        + 17 * win_quality
+        + 10 * median_roi_quality
+        + 12 * sample_quality
+        + 13 * copyability
+        + 8 * alpha_quality
+        + 5 * decay_quality
+        + 12 * data_confidence
+        - 16 * concentration_penalty
+        - 18 * risk_penalty
     )
-    score = max(0.0, min(100.0, raw))
+    score = _clamp(raw / 100.0) * 100.0
 
     notes: list[str] = []
-    if f.closed_tokens < 8:
+    if w30.closed_tokens < 8:
         notes.append("sample_small")
+        score = min(score, 49.9)
+    if w30.top1_profit_concentration >= 0.80:
+        notes.append("top1_profit_concentrated")
         score = min(score, 59.9)
     if rug_exposure >= 0.20:
         notes.append("rug_exposure_high")
         score = min(score, 39.9)
-    if f.max_trades_per_minute >= 50:
+    if w30.max_trades_per_minute >= 50:
         notes.append("hft_or_market_maker")
-        score = min(score, 29.9)
-    if f.same_slot_ratio >= 0.60:
+        score = min(score, 34.9)
+    if w30.same_slot_ratio >= 0.60:
         notes.append("bundle_or_cluster_risk")
         score = min(score, 39.9)
+    if copyability < 0.35:
+        notes.append("non_copyable_speed")
 
-    if score >= 80:
-        tier = "S"
-    elif score >= 65:
-        tier = "A"
+    if score >= 78 and copyability >= 0.55 and data_confidence >= 0.45:
+        tier, wallet_class = "A", "Copyable Wallet"
+    elif score >= 62 and copyability < 0.35:
+        tier, wallet_class = "ALPHA", "Non-copyable Alpha"
+    elif score >= 62 and data_confidence >= 0.35:
+        tier, wallet_class = "A-", "Radar Wallet"
     elif score >= 50:
-        tier = "B"
+        tier, wallet_class = "B+", "Confirmation Wallet"
     else:
-        tier = "REJECT"
+        tier, wallet_class = "REJECT", "Rejected"
 
     return WalletScore(
         wallet=f.wallet,
         score=round(score, 4),
         tier=tier,
-        copyable_pnl_sol=round(f.realized_quote_pnl_sol, 9),
-        win_rate=round(win_rate, 6),
-        rug_exposure=round(rug_exposure, 6),
-        sample_quality=round(sample_quality, 6),
-        hft_penalty=round(hft_penalty, 6),
+        wallet_class=wallet_class,
+        pnl_30d_sol=round(w30.realized_pnl_sol, 9),
+        win_rate_7d=round(wr7, 6),
+        win_rate_15d=round(wr15, 6),
+        win_rate_30d=round(wr30, 6),
+        median_roi_30d=round(w30.median_token_roi, 6),
+        top1_concentration=round(w30.top1_profit_concentration, 6),
+        top3_concentration=round(w30.top3_profit_concentration, 6),
+        copyability=round(copyability, 6),
+        data_confidence=round(data_confidence, 6),
         notes=tuple(notes),
     )
 
 
 def freeze_snapshot(scores: Iterable[WalletScore], metadata: dict) -> tuple[str, str]:
-    kept = [asdict(s) for s in scores if s.tier in {"S", "A", "B"}]
+    kept = [asdict(s) for s in scores if s.wallet_class != "Rejected"]
     kept.sort(key=lambda x: (-x["score"], x["wallet"]))
     payload = {"metadata": metadata, "wallets": kept}
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
