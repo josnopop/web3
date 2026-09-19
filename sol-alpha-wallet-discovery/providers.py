@@ -61,6 +61,18 @@ def detect_sources() -> list[DataSourceStatus]:
             "token top-trader adapter",
         ),
         DataSourceStatus(
+            "DEX Screener",
+            True,
+            Coverage.LIVE_ONLY,
+            "no-key Solana token-profile/boost seed adapter",
+        ),
+        DataSourceStatus(
+            "Cielo",
+            bool(os.getenv("CIELO_API_KEY")),
+            Coverage.LIVE_ONLY,
+            "Solana trending-token seed adapter",
+        ),
+        DataSourceStatus(
             "Birdeye",
             bool(os.getenv("BIRDEYE_API_KEY")),
             Coverage.LIVE_ONLY,
