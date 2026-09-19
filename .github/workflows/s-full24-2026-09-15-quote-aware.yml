@@ -1,0 +1,30 @@
+name: s-full24-2026-09-15-quote-aware
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s-full24-2026-09-15-quote-aware.yml"
+      - "sol-alpha-wallet-discovery/s_quote_replay.py"
+  workflow_dispatch:
+jobs:
+  replay:
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: Replay
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          mkdir -p out/s15_quote
+          python s_quote_replay.py --pool s_simple12_2026_09_19.json --date 2026-09-15 --shard ${{ matrix.shard }} --out out/s15_quote/shard_${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s15-quote-${{ matrix.shard }}
+          path: sol-alpha-wallet-discovery/out/s15_quote/shard_${{ matrix.shard }}.json
