@@ -16,8 +16,6 @@ def rpc(m,p):
    if z.get("result") is not None:return z["result"]
   except: time.sleep(.4*(k+1))
  return None
-src=json.load(open("out/shard_0.json"))
-# replay artifact has no sig list; refetch exact local day signatures
 start=1789660800; end=1789747200
 before=None;sigs=[]
 for _ in range(20):
