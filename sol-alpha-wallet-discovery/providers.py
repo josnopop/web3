@@ -49,6 +49,36 @@ def detect_sources() -> list[DataSourceStatus]:
             "no key required; exact timestamps but rate-limited/bounded historical coverage",
         ),
         DataSourceStatus(
+            "OKX Onchain Smart Money",
+            all(os.getenv(k) for k in ("OKX_API_KEY","OKX_SECRET_KEY","OKX_API_PASSPHRASE")),
+            Coverage.LIVE_ONLY,
+            "leaderboard adapter; Solana smart money/whale/new/sniper/Pump smart money",
+        ),
+        DataSourceStatus(
+            "Solana Tracker",
+            bool(os.getenv("SOLANATRACKER_API_KEY")),
+            Coverage.LIVE_ONLY,
+            "token top-trader adapter",
+        ),
+        DataSourceStatus(
+            "Birdeye",
+            bool(os.getenv("BIRDEYE_API_KEY")),
+            Coverage.LIVE_ONLY,
+            "smart-money token seed adapter",
+        ),
+        DataSourceStatus(
+            "Nansen",
+            bool(os.getenv("NANSEN_API_KEY")),
+            Coverage.LIVE_ONLY,
+            "Solana smart-money DEX-trade adapter",
+        ),
+        DataSourceStatus(
+            "Codex / Defined / Axiom trade-source views",
+            bool(os.getenv("CODEX_API_KEY")),
+            Coverage.LIVE_ONLY,
+            "filterWallets adapter; can discover Solana wallets and source views",
+        ),
+        DataSourceStatus(
             "GMGN / DegenRadar live discovery",
             True,
             Coverage.LIVE_ONLY,
