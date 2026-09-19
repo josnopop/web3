@@ -1,5 +1,5 @@
 {
-  "freeze_label": "2026-09-15 strict verified pool v2",
+  "freeze_label": "2026-09-15 strict verified pool v3",
   "replay_day_local": "2026-09-16",
   "timezone": "UTC+8",
   "rules": {
@@ -143,6 +143,42 @@
       "trades_30d": 2327,
       "pnl_usd_30d": 37727,
       "note": "Radar/anomaly flag: unusually perfect WR; must survive chain recomputation"
+    },
+    {
+      "name": "Cented",
+      "address": "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",
+      "snapshot": "2026-09-08",
+      "wr_30d": 0.7742,
+      "trades_30d": 2428,
+      "pnl_usd_30d": 224081,
+      "note": "high-frequency; latency/copyability check required"
+    },
+    {
+      "name": "Cupsey",
+      "address": "2fg5QD1eD7rzNNCsvnhmXFm5hqNgwTTG8p7kQ6f3rx6f",
+      "snapshot": "2026-09-08",
+      "wr_30d": 0.9425,
+      "trades_30d": 2346,
+      "pnl_usd_30d": 447372,
+      "note": "very high WR/high-frequency; speed/anomaly check required"
+    },
+    {
+      "name": "Dior",
+      "address": "87rRdssFiTJKY4MGARa4G5vQ31hmR7MxSmhzeaJ5AAxJ",
+      "snapshot": "2026-09-08",
+      "wr_30d": 0.5395,
+      "trades_30d": 1655,
+      "pnl_usd_30d": 366009,
+      "note": "positive expectancy / confirmation candidate; lower hit rate"
+    },
+    {
+      "name": "Gake",
+      "address": "DNfuF1L62WWyW3pNakVkyGGFzVVhj4Yr52jSmdTyeBHm",
+      "snapshot": "2026-09-08",
+      "wr_30d": 1,
+      "trades_30d": 80,
+      "pnl_usd_30d": 184788,
+      "note": "Radar/anomaly: 100% WR; do not treat as automatically copyable"
     }
   ]
 }
