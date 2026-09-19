@@ -54,10 +54,12 @@ def _walk_wallets(obj: Any) -> set[str]:
     if isinstance(obj, dict):
         for k, v in obj.items():
             key = str(k).lower()
+            is_token_key = any(x in key for x in ("token", "mint", "contract", "pool", "pair"))
             if (
                 isinstance(v, str)
                 and SOL_ADDR_RE.fullmatch(v)
-                and any(x in key for x in ("wallet", "address", "trader", "signer", "maker"))
+                and not is_token_key
+                and any(x in key for x in ("wallet", "address", "trader", "signer", "maker", "owner"))
             ):
                 out.add(v)
             out.update(_walk_wallets(v))
