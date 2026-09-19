@@ -6,10 +6,12 @@ from multi_source_discovery import (
     Evidence,
     _walk_mints,
     _walk_wallets,
+    arkham_candidates,
     bitquery_candidates,
     cielo_seed_mints,
     codex_candidates,
     dexscreener_seed_mints,
+    dune_candidates,
     merge,
 )
 
@@ -81,6 +83,26 @@ class MultiSourceDiscoveryTests(unittest.TestCase):
     def test_cielo_seed_mints(self, req):
         req.return_value = {"data": [{"token": {"mint": MINT}}]}
         self.assertEqual(cielo_seed_mints(), {MINT})
+
+
+    @patch.dict(os.environ, {"ARKHAM_API_KEY": "test"}, clear=True)
+    @patch("multi_source_discovery._request_json")
+    def test_arkham_holder_adapter(self, req):
+        req.return_value = {"holders": [{"address": W1}]}
+        rows = arkham_candidates([MINT], per_token_limit=10)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].wallet, W1)
+        self.assertEqual(rows[0].source, "Arkham Intel")
+
+    @patch.dict(os.environ, {"DUNE_API_KEY": "test", "DUNE_QUERY_IDS": "123,456"}, clear=True)
+    @patch("multi_source_discovery._request_json")
+    def test_dune_query_wallet_adapter(self, req):
+        req.return_value = {"result": {"rows": [{"wallet": W1}]}}
+        rows = dune_candidates()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].wallet, W1)
+        self.assertEqual(len(rows[0].metadata["queries"]), 2)
+        self.assertEqual(req.call_count, 2)
 
     @patch.dict(os.environ, {"BITQUERY_TOKEN": "ory_test"}, clear=True)
     @patch("multi_source_discovery._request_json")
