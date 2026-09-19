@@ -1,0 +1,31 @@
+name: multi-source-discovery-smoke
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - "sol-alpha-wallet-discovery/multi_source_discovery.py"
+      - "sol-alpha-wallet-discovery/providers.py"
+      - "sol-alpha-wallet-discovery/tests/test_multi_source_discovery.py"
+      - ".github/workflows/multi-source-discovery-smoke.yml"
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: No-key multi-source smoke
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python multi_source_discovery.py \
+            --mints-file historical_priority_mints_50.json \
+            --no-okx --no-cielo --no-solanatracker --no-birdeye --no-nansen --no-codex --no-bitquery --no-gmgn \
+            --out out/smoke/multi_source_candidates.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multi-source-smoke
+          path: sol-alpha-wallet-discovery/out/smoke/multi_source_candidates.json
+          if-no-files-found: error
