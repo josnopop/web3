@@ -1,0 +1,20 @@
+name: s18-top1-deep-audit
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths: [".github/workflows/s18-top1-deep-audit.yml"]
+jobs:
+ audit:
+  runs-on: ubuntu-latest
+  timeout-minutes: 20
+  steps:
+   - uses: actions/checkout@v4
+   - name: Audit
+     working-directory: sol-alpha-wallet-discovery
+     run: |
+       mkdir -p out
+       python top1_deep_audit.py
+   - uses: actions/upload-artifact@v4
+     with:
+      name: s18-top1-deep-audit
+      path: sol-alpha-wallet-discovery/out/top1_audit.json
