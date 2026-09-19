@@ -6,23 +6,29 @@ on:
     paths:
       - "sol-alpha-wallet-discovery/frozen_wallets_2026_09_15.json"
       - "sol-alpha-wallet-discovery/recover_day_signatures.py"
+      - "sol-alpha-wallet-discovery/public_rpc_scan.py"
       - ".github/workflows/recover-wallet-day.yml"
   workflow_dispatch:
 
 jobs:
   recover:
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        index: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Recover exact Sep-16 signatures for frozen pool
+      - name: Recover exact Sep-16 signatures
         working-directory: sol-alpha-wallet-discovery
-        run: python recover_day_signatures.py --date 2026-09-16 --pages 10
+        run: python recover_day_signatures.py --date 2026-09-16 --pages 10 --index ${{ matrix.index }}
       - uses: actions/upload-artifact@v4
         with:
-          name: wallet-signatures-2026-09-16
-          path: sol-alpha-wallet-discovery/out/2026-09-16/wallet_signatures.json
+          name: wallet-signatures-2026-09-16-${{ matrix.index }}
+          path: sol-alpha-wallet-discovery/out/2026-09-16/wallet_signatures_*.json
           if-no-files-found: error
