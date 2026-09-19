@@ -31,7 +31,7 @@ jobs:
       - name: Decode DEX swaps in RPC batches
         working-directory: sol-alpha-wallet-discovery
         run: |
-          python decode_wallet_trades.py --input ../input --out out/2026-09-16/trades_${{ matrix.index }}.json --rpc https://solana-rpc.publicnode.com --batch-size 20
+          python decode_wallet_trades.py --input ../input --out out/2026-09-16/trades_${{ matrix.index }}.json --rpc https://solana.drpc.org/ --batch-size 20
       - uses: actions/upload-artifact@v4
         with:
           name: wallet-trades-2026-09-16-${{ matrix.index }}
