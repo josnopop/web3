@@ -1,0 +1,27 @@
+name: s16-s10-balance-audit-fast
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s16-s10-balance-audit-fast.yml"
+      - "sol-alpha-wallet-discovery/s16_s10_balance_audit_fast.py"
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOLANA_RPC_URL: https://api.mainnet.solana.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Batch audit
+        working-directory: sol-alpha-wallet-discovery
+        run: python s16_s10_balance_audit_fast.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s16-s10-balance-audit-fast
+          path: sol-alpha-wallet-discovery/out/s16_s10_balance_audit_fast.json
+          if-no-files-found: error
