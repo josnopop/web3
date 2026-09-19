@@ -65,3 +65,42 @@ Outputs:
 - `out/2026-09-16/replay_trades.csv`
 
 `replay_trades.csv` then goes into **Trade Quality V0.3**. A profitable wallet never creates an automatic bot BUY.
+
+
+## Multi-source discovery V0.4
+
+Live/broad wallet discovery now merges independent evidence from every supported stable adapter:
+
+- MadeOnSol dated/current discovery
+- Pump.fun dated-token Early Buyers
+- Solana DEX chain scan / public RPC
+- OKX Onchain Smart Money leaderboard (smart money, whale, new wallet, sniper, Pump smart money)
+- Solana Tracker token Top Traders
+- Birdeye Smart Money token seeds
+- Nansen Smart Money DEX trades
+- Codex wallet filters, including Axiom and Defined trade-source views
+- Bitquery Solana token Top Traders
+- GMGN CLI and DegenRadar JSON bridge
+
+Historical/chain backends:
+- BigQuery Solana public dataset
+- Helius RPC when `HELIUS_API_KEY` is configured
+- Solana Tracker RPC when `SOLANATRACKER_API_KEY` is configured
+- Public Solana RPC as final fallback
+
+Credentials are read only from environment variables:
+`OKX_API_KEY`, `OKX_SECRET_KEY`, `OKX_API_PASSPHRASE`, optional `OKX_PROJECT_ID`,
+`SOLANATRACKER_API_KEY`, `BIRDEYE_API_KEY`, `NANSEN_API_KEY`,
+`CODEX_API_KEY`, `BITQUERY_TOKEN` (or `BITQUERY_API_KEY`), `HELIUS_API_KEY`.
+
+Example:
+
+```bash
+python multi_source_discovery.py \
+  --mints-file historical_priority_mints_50.json \
+  --out out/live/multi_source_candidates.json
+```
+
+Each source is isolated: missing credentials or one failing provider never stops the other discovery sources.
+Live-only provider output is **candidate discovery only** and is never back-filled into a historical frozen pool.
+Final copy permission still comes from Wallet Score V0.3/V0.4 using timestamp-bounded chain history.
