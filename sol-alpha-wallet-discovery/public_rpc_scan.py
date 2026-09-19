@@ -10,7 +10,17 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Iterable
 
-DEFAULT_RPC = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
+def _default_rpc() -> str:
+    if os.getenv("SOLANA_RPC_URL"):
+        return os.environ["SOLANA_RPC_URL"]
+    if os.getenv("HELIUS_API_KEY"):
+        return "https://mainnet.helius-rpc.com/?api-key=" + os.environ["HELIUS_API_KEY"]
+    if os.getenv("SOLANATRACKER_API_KEY"):
+        return "https://rpc-mainnet.solanatracker.io/?api_key=" + os.environ["SOLANATRACKER_API_KEY"]
+    return "https://api.mainnet-beta.solana.com"
+
+
+DEFAULT_RPC = _default_rpc()
 
 
 @dataclass(frozen=True)
