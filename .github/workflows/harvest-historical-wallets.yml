@@ -20,7 +20,7 @@ jobs:
       - name: Crawl only Sep-15 historical profile snapshots
         working-directory: sol-alpha-wallet-discovery
         run: |
-          python harvest_historical_candidates.py --max-profiles 500 --workers 20 --batch-size 40
+          python harvest_historical_candidates.py --max-profiles 150 --workers 30 --batch-size 50
       - uses: actions/upload-artifact@v4
         with:
           name: historical-wallet-candidates-2026-09-15
