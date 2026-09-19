@@ -14,6 +14,7 @@ def main():
     p.add_argument("--date", required=True)
     p.add_argument("--wallets", default="frozen_wallets_2026_09_15.json")
     p.add_argument("--pages", type=int, default=10)
+    p.add_argument("--index", type=int, default=None)
     p.add_argument("--out", default=None)
     args = p.parse_args()
 
@@ -21,6 +22,9 @@ def main():
     start, end = utc_window_for_local_day(day)
     start_ts, end_ts = int(start.timestamp()), int(end.timestamp())
     data = json.loads(Path(args.wallets).read_text(encoding="utf-8"))
+    wallets = data["wallets"]
+    if args.index is not None:
+        wallets = [wallets[args.index]]
 
     result = {
         "replay_day_local": args.date,
@@ -30,10 +34,8 @@ def main():
         "wallets": [],
     }
 
-    for i, w in enumerate(data["wallets"], 1):
-        rows = list(iter_signatures(
-            w["address"], start_ts, end_ts, max_pages=args.pages
-        ))
+    for w in wallets:
+        rows = list(iter_signatures(w["address"], start_ts, end_ts, max_pages=args.pages))
         item = {
             "name": w["name"],
             "address": w["address"],
@@ -43,12 +45,12 @@ def main():
             "signatures": [r.signature for r in rows],
         }
         result["wallets"].append(item)
-        print(f"[{i:02d}/{len(data['wallets'])}] {w['name']}: {len(rows)} tx")
+        print(f"{w['name']}: {len(rows)} tx")
 
-    out = Path(args.out or f"out/{args.date}/wallet_signatures.json")
+    suffix = f"_{args.index:02d}" if args.index is not None else ""
+    out = Path(args.out or f"out/{args.date}/wallet_signatures{suffix}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"TOTAL={sum(x['successful_transactions'] for x in result['wallets'])}")
     print(f"WROTE={out}")
 
 
