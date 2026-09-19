@@ -250,301 +250,122 @@ def nansen_candidates(limit: int = 100) -> list[Evidence]:
     ]
 
 
+def bitquery_candidates(mints: list[str], per_token_limit: int = 100) -> list[Evidence]:
+    token = os.getenv("BITQUERY_API_KEY") or os.getenv("BITQUERY_TOKEN")
+    if not token:
+        raise RuntimeError("missing BITQUERY_API_KEY/BITQUERY_TOKEN")
+    endpoint = os.getenv("BITQUERY_GRAPHQL_URL", "https://streaming.bitquery.io/graphql")
+    evidence: dict[str, Evidence] = {}
+    query = """
+    query TopTraders($mint: String!, $limit: Int!) {
+      Solana(dataset: realtime) {
+        DEXTradeByTokens(
+          where: {
+            Trade: {
+              Currency: { MintAddress: { is: $mint } }
+              Side: { Currency: { MintAddress: { is: "So11111111111111111111111111111111111111112" } } }
+            }
+            Transaction: { Result: { Success: true } }
+          }
+          orderBy: { descendingByField: "volume" }
+          limit: { count: $limit }
+        ) {
+          Trade { Account { Owner } }
+          buys: count(if: { Trade: { Side: { Type: { is: buy } } } })
+          sells: count(if: { Trade: { Side: { Type: { is: sell } } } })
+          volume: sum(of: Trade_Side_AmountInUSD)
+          trades: count
+        }
+      }
+    }
+    """
+    auth = token if token.lower().startswith("bearer ") else "Bearer " + token
+    for mint in mints:
+        payload = _request_json(
+            endpoint,
+            headers={"Authorization": auth},
+            method="POST",
+            body={"query": query, "variables": {"mint": mint, "limit": min(per_token_limit, 100)}},
+        )
+        if payload.get("errors"):
+            raise RuntimeError(str(payload["errors"])[:500])
+        rows = (((payload.get("data") or {}).get("Solana") or {}).get("DEXTradeByTokens") or [])
+        for row in rows:
+            owner = (((row.get("Trade") or {}).get("Account") or {}).get("Owner"))
+            if not owner or not SOL_ADDR_RE.fullmatch(owner):
+                continue
+            hit = {
+                "mint": mint,
+                "buys": row.get("buys"),
+                "sells": row.get("sells"),
+                "volume_usd": row.get("volume"),
+                "trades": row.get("trades"),
+            }
+            if owner not in evidence:
+                evidence[owner] = Evidence(owner, "Bitquery", "token_top_trader", True, {"tokens": [hit]})
+            else:
+                evidence[owner].metadata.setdefault("tokens", []).append(hit)
+        time.sleep(0.05)
+    return list(evidence.values())
+
+
 def codex_candidates(limit: int = 100) -> list[Evidence]:
     key = os.getenv("CODEX_API_KEY")
     if not key:
         raise RuntimeError("missing CODEX_API_KEY")
     endpoint = os.getenv("CODEX_GRAPHQL_URL", "https://graph.codex.io/graphql")
-    query = """
-    query DiscoverSolanaWallets($limit: Int!) {
-      filterWallets(input: {
-        filters: { networkId: 1399811149, swaps1w: { gte: 3 } }
-        rankings: [{ attribute: realizedProfitUsd1w, direction: DESC }]
-        limit: $limit
-      }) {
-        results {
-          address labels lastTransactionAt firstTransactionAt
-          realizedProfitUsd1w realizedProfitPercentage1w winRate1w
-          swaps1w uniqueTokens1w
-          realizedProfitUsd30d realizedProfitPercentage30d winRate30d
-          swaps30d uniqueTokens30d
-        }
-      }
-    }
-    """
     header_name = os.getenv("CODEX_API_HEADER", "Authorization")
-    payload = _request_json(
-        endpoint,
-        headers={header_name: key},
-        method="POST",
-        body={"query": query, "variables": {"limit": min(limit, 100)}},
-    )
-    if payload.get("errors"):
-        raise RuntimeError(str(payload["errors"])[:500])
-    rows = (
-        ((payload.get("data") or {}).get("filterWallets") or {}).get("results")
-        or []
-    )
-    out = []
-    for row in rows:
-        wallet = row.get("address")
-        if wallet and SOL_ADDR_RE.fullmatch(wallet):
-            out.append(
-                Evidence(wallet, "Codex/Defined", "wallet_filter", True, row)
-            )
-    return out
+    evidence: dict[tuple[str, str], Evidence] = {}
 
-
-def gmgn_candidates(limit: int = 200) -> list[Evidence]:
-    exe = shutil.which("gmgn-cli")
-    if not exe:
-        raise RuntimeError("gmgn-cli not installed")
-    cp = subprocess.run(
-        [
-            exe,
-            "track",
-            "smartmoney",
-            "--chain",
-            "sol",
-            "--limit",
-            str(limit),
-            "--raw",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    payload = json.loads(cp.stdout)
-    return [
-        Evidence(w, "GMGN", "smartmoney", True, {})
-        for w in sorted(_walk_wallets(payload))
-    ]
-
-
-def json_bridge(path: str, source: str) -> list[Evidence]:
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    return [
-        Evidence(w, source, "json_bridge", True, {})
-        for w in sorted(_walk_wallets(payload))
-    ]
-
-
-def merge(groups: list[list[Evidence]]) -> list[dict[str, Any]]:
-    merged: dict[str, dict[str, Any]] = {}
-    for group in groups:
-        for e in group:
-            row = merged.setdefault(
-                e.wallet,
-                {
-                    "wallet": e.wallet,
-                    "sources": set(),
-                    "evidence": [],
-                    "source_count": 0,
-                },
-            )
-            row["sources"].add(e.source)
-            row["evidence"].append(
-                {
-                    "source": e.source,
-                    "kind": e.kind,
-                    "live_only": e.live_only,
-                    "metadata": e.metadata,
-                }
-            )
-    out = []
-    for row in merged.values():
-        row["sources"] = sorted(row["sources"])
-        row["source_count"] = len(row["sources"])
-        # Priority is only for discovery queue ordering, never copy permission.
-        row["discovery_priority"] = (
-            row["source_count"] * 10 + len(row["evidence"])
+    # Codex powers Defined and exposes trade-source IDs such as "axiom" and "defined".
+    # Query all-wallet performance plus explicit Axiom/Defined views.
+    for trade_source, source_name in (
+        (None, "Codex Wallet Filter"),
+        ("axiom", "Axiom via Codex"),
+        ("defined", "Defined via Codex"),
+    ):
+        source_clause = (
+            ""
+            if trade_source is None
+            else f'includeTradeSourceIds: ["{trade_source}"]'
         )
-        out.append(row)
-    out.sort(
-        key=lambda x: (
-            -x["discovery_priority"],
-            -x["source_count"],
-            x["wallet"],
+        query = f"""
+        query DiscoverSolanaWallets($limit: Int!) {{
+          filterWallets(input: {{
+            filters: {{ networkId: 1399811149, swaps1w: {{ gte: 3 }} }}
+            {source_clause}
+            rankings: [{{ attribute: realizedProfitUsd1w, direction: DESC }}]
+            limit: $limit
+          }}) {{
+            results {{
+              address labels tradeSourceIds lastTransactionAt firstTransactionAt
+              realizedProfitUsd1w realizedProfitPercentage1w winRate1w
+              swaps1w uniqueTokens1w
+              realizedProfitUsd30d realizedProfitPercentage30d winRate30d
+              swaps30d uniqueTokens30d
+            }}
+          }}
+        }}
+        """
+        payload = _request_json(
+            endpoint,
+            headers={header_name: key},
+            method="POST",
+            body={"query": query, "variables": {"limit": min(limit, 100)}},
         )
-    )
-    return out
-
-
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument(
-        "--mints-file",
-        help="JSON/text token-mint source for token-top-trader adapters",
-    )
-    p.add_argument("--degenradar-json")
-    p.add_argument(
-        "--extra-json",
-        action="append",
-        default=[],
-        help="SOURCE=path",
-    )
-    p.add_argument("--out", required=True)
-    p.add_argument("--no-okx", action="store_true")
-    p.add_argument("--no-solanatracker", action="store_true")
-    p.add_argument("--no-birdeye", action="store_true")
-    p.add_argument("--no-nansen", action="store_true")
-    p.add_argument("--no-codex", action="store_true")
-    p.add_argument("--no-gmgn", action="store_true")
-    args = p.parse_args()
-
-    mints: set[str] = set()
-    if args.mints_file:
-        txt = Path(args.mints_file).read_text(encoding="utf-8")
-        try:
-            mints.update(_walk_mints(json.loads(txt)))
-        except Exception:
-            mints.update(
-                x
-                for x in re.findall(
-                    r"[1-9A-HJ-NP-Za-km-z]{32,44}", txt
-                )
-                if SOL_ADDR_RE.fullmatch(x)
-            )
-
-    groups: list[list[Evidence]] = []
-    runs: list[SourceRun] = []
-
-    def run_source(name: str, enabled: bool, fn):
-        if not enabled:
-            runs.append(
-                SourceRun(
-                    name,
-                    False,
-                    False,
-                    0,
-                    "disabled or credentials unavailable",
-                )
-            )
-            return
-        try:
-            rows = fn()
-            groups.append(rows)
-            runs.append(SourceRun(name, True, True, len(rows)))
-        except Exception as e:
-            runs.append(
-                SourceRun(
-                    name,
+        if payload.get("errors"):
+            raise RuntimeError(str(payload["errors"])[:500])
+        rows = (((payload.get("data") or {}).get("filterWallets") or {}).get("results") or [])
+        for row in rows:
+            wallet = row.get("address")
+            if wallet and SOL_ADDR_RE.fullmatch(wallet):
+                evidence[(wallet, source_name)] = Evidence(
+                    wallet,
+                    source_name,
+                    "wallet_filter",
                     True,
-                    False,
-                    0,
-                    f"{type(e).__name__}: {e}",
+                    row,
                 )
-            )
-
-    run_source(
-        "OKX Onchain",
-        not args.no_okx and bool(os.getenv("OKX_API_KEY")),
-        okx_candidates,
-    )
-
-    if not args.no_birdeye and os.getenv("BIRDEYE_API_KEY"):
-        try:
-            rows, more_mints = birdeye_seed_mints()
-            groups.append(rows)
-            mints.update(more_mints)
-            runs.append(
-                SourceRun(
-                    "Birdeye",
-                    True,
-                    True,
-                    len(rows),
-                    f"seed_mints={len(more_mints)}",
-                )
-            )
-        except Exception as e:
-            runs.append(
-                SourceRun(
-                    "Birdeye",
-                    True,
-                    False,
-                    0,
-                    f"{type(e).__name__}: {e}",
-                )
-            )
-    else:
-        runs.append(
-            SourceRun(
-                "Birdeye",
-                False,
-                False,
-                0,
-                "disabled or credentials unavailable",
-            )
-        )
-
-    run_source(
-        "Solana Tracker",
-        not args.no_solanatracker
-        and bool(os.getenv("SOLANATRACKER_API_KEY"))
-        and bool(mints),
-        lambda: solanatracker_candidates(sorted(mints)[:50]),
-    )
-    run_source(
-        "Nansen",
-        not args.no_nansen and bool(os.getenv("NANSEN_API_KEY")),
-        nansen_candidates,
-    )
-    run_source(
-        "Codex/Defined",
-        not args.no_codex and bool(os.getenv("CODEX_API_KEY")),
-        codex_candidates,
-    )
-    run_source(
-        "GMGN",
-        not args.no_gmgn and shutil.which("gmgn-cli") is not None,
-        gmgn_candidates,
-    )
-
-    if args.degenradar_json:
-        run_source(
-            "DegenRadar",
-            Path(args.degenradar_json).exists(),
-            lambda: json_bridge(args.degenradar_json, "DegenRadar"),
-        )
-    for spec in args.extra_json:
-        source, path = spec.split("=", 1)
-        run_source(
-            source,
-            Path(path).exists(),
-            lambda p=path, s=source: json_bridge(p, s),
-        )
-
-    wallets = merge(groups)
-    payload = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "purpose": (
-            "live/broad candidate discovery; never use live-only evidence "
-            "as proof in historical freezes"
-        ),
-        "historical_backfill_allowed": False,
-        "sources": [asdict(x) for x in runs],
-        "seed_mint_count": len(mints),
-        "unique_wallet_count": len(wallets),
-        "wallets": wallets,
-    }
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    print(
-        f"UNIQUE_WALLETS={len(wallets)} "
-        f"SOURCES_OK={sum(x.ok for x in runs)} "
-        f"SEED_MINTS={len(mints)}"
-    )
-    for x in runs:
-        print(
-            f"{x.source}: enabled={x.enabled} ok={x.ok} "
-            f"count={x.count} {x.reason}"
-        )
-    print(f"WROTE={out}")
+    return list(evidence.values())
 
 
-if __name__ == "__main__":
-    main()
