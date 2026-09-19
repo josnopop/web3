@@ -1,0 +1,81 @@
+name: Paradex P02 Ephemeral Account Probe
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  p02:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pinned official Paradex SDK
+        run: python -m pip install --disable-pip-version-check "paradex-py==0.7.0"
+      - name: Ephemeral onboarding and authenticated reads
+        shell: bash
+        env:
+          PARADEX_ENVIRONMENT: nightly
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import secrets
+
+          from paradex_py import Paradex
+          from paradex_py.environment import NIGHTLY
+          from starknet_py.constants import EC_ORDER
+
+          if os.environ.get("PARADEX_L1_PRIVATE_KEY") or os.environ.get("PARADEX_L2_PRIVATE_KEY"):
+              raise RuntimeError("P02 refuses externally supplied private keys")
+
+          private_key = secrets.randbelow(EC_ORDER - 1) + 1
+          dummy_l1_address = "0x" + secrets.token_hex(20)
+
+          client = Paradex(
+              env=NIGHTLY,
+              l1_address=dummy_l1_address,
+              l2_private_key=hex(private_key),
+              server_derive_address=True,
+              ws_url_override="wss://ws.api.nightly.paradex.trade/v1",
+          )
+          private_key = None
+
+          if client.account is None:
+              raise RuntimeError("account initialization failed")
+
+          summary = client.api_client.fetch_account_summary()
+          balances = client.api_client.fetch_balances()
+          positions = client.api_client.fetch_positions()
+          orders = client.api_client.fetch_orders()
+          fills = client.api_client.fetch_fills()
+
+          def result_count(value):
+              if isinstance(value, dict):
+                  rows = value.get("results")
+                  return len(rows) if isinstance(rows, list) else 0
+              return 0
+
+          result = {
+              "environment": "PARADEX_NIGHTLY_SANDBOX",
+              "ephemeral_wallet": True,
+              "private_key_logged": False,
+              "private_key_persisted": False,
+              "orders_submitted": 0,
+              "authenticated_account_summary": summary is not None,
+              "balances_read": isinstance(balances, dict),
+              "positions_count": result_count(positions),
+              "open_orders_count": result_count(orders),
+              "fills_count": result_count(fills),
+              "account_address": hex(client.account.l2_address),
+          }
+          print("P02_RESULT=" + json.dumps(result, sort_keys=True))
+          if not result["authenticated_account_summary"] or not result["balances_read"]:
+              raise SystemExit("P02 authenticated-read acceptance failed")
+          PY
