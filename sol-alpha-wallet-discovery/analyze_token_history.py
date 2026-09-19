@@ -173,12 +173,17 @@ def main():
 
     mint_pk = Pubkey.from_string(args.mint)
     curve, _ = Pubkey.find_program_address([b"bonding-curve", bytes(mint_pk)], PUMPFUN)
-    sigs = signatures(str(curve), args.pages, args.rpc)
+    curve_sigs = signatures(str(curve), args.pages, args.rpc)
+    mint_sigs = signatures(args.mint, args.pages, args.rpc)
+    merged = {}
+    for row in curve_sigs + mint_sigs:
+        merged[row["signature"]] = row
+    sigs = sorted(merged.values(), key=lambda x: (x["blockTime"], x["slot"]))
 
     decoded = []
     errors = 0
-    # Decode all rows around launch through one hour after signal; avoids wasting RPC
-    # on far-later history while preserving contemporaneous signal context.
+    # Curve history establishes launch; mint history keeps following the token after
+    # migration to PumpSwap/Jupiter/Raydium. Decode only through one hour after signal.
     for i, row in enumerate(sigs):
         if row["blockTime"] > args.signal_ts + 3600:
             continue
@@ -196,10 +201,15 @@ def main():
         "mint": args.mint,
         "pumpfun_program_id": PUMPFUN_PROGRAM_ID,
         "bonding_curve": str(curve),
+        "curve_signature_rows_fetched": len(curve_sigs),
+        "mint_signature_rows_fetched": len(mint_sigs),
         "signature_rows_fetched": len(sigs),
         "decoded_trade_rows": len(decoded),
         "decode_errors": errors,
-        "history_may_be_truncated": len(sigs) >= args.pages * 1000,
+        "history_may_be_truncated": (
+            len(curve_sigs) >= args.pages * 1000
+            or len(mint_sigs) >= args.pages * 1000
+        ),
         "snapshot": summary,
         "trades": decoded,
     }
