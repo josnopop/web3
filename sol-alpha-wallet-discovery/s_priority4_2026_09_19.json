@@ -1,0 +1,21 @@
+{
+  "purpose": "S-v2 priority validation after RPC rotation",
+  "wallets": [
+    {
+      "wallet": "2NoNSAa4F9Srj3M6myFtKTk9VWrYqyHBMbCwwepfYmwi",
+      "score": 93.4
+    },
+    {
+      "wallet": "4YrqTrUJ7JMNTPvRJeRN3TGxQ4KiPz7tom83XJN6aUa1",
+      "score": 93.2
+    },
+    {
+      "wallet": "2ksQ77e9e5SS6VA6poanRGWfkU3R4R5wZnptbJHb2nx9",
+      "score": 91.107
+    },
+    {
+      "wallet": "7Mn84HYtybo6E4ctY3wui7SSmKkWrCQC5vJhzb7399Jb",
+      "score": 89.508
+    }
+  ]
+}
