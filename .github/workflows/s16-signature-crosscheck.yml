@@ -1,0 +1,50 @@
+name: s16-signature-crosscheck
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - ".github/workflows/s16-signature-crosscheck.yml"
+  workflow_dispatch:
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        include:
+          - {label: s1-mainnet, wallet: "8TawwodB8Mkk1YnqJjEau5Cerix4wms61Yw1gTAc6n49", rpc: "https://api.mainnet.solana.com"}
+          - {label: s1-publicnode, wallet: "8TawwodB8Mkk1YnqJjEau5Cerix4wms61Yw1gTAc6n49", rpc: "https://solana-rpc.publicnode.com"}
+          - {label: s1-drpc, wallet: "8TawwodB8Mkk1YnqJjEau5Cerix4wms61Yw1gTAc6n49", rpc: "https://solana.drpc.org/"}
+          - {label: s3-mainnet, wallet: "2NoNSAa4F9Srj3M6myFtKTk9VWrYqyHBMbCwwepfYmwi", rpc: "https://api.mainnet.solana.com"}
+          - {label: s3-publicnode, wallet: "2NoNSAa4F9Srj3M6myFtKTk9VWrYqyHBMbCwwepfYmwi", rpc: "https://solana-rpc.publicnode.com"}
+          - {label: s3-drpc, wallet: "2NoNSAa4F9Srj3M6myFtKTk9VWrYqyHBMbCwwepfYmwi", rpc: "https://solana.drpc.org/"}
+          - {label: s5-mainnet, wallet: "4YrqTrUJ7JMNTPvRJeRN3TGxQ4KiPz7tom83XJN6aUa1", rpc: "https://api.mainnet.solana.com"}
+          - {label: s5-publicnode, wallet: "4YrqTrUJ7JMNTPvRJeRN3TGxQ4KiPz7tom83XJN6aUa1", rpc: "https://solana-rpc.publicnode.com"}
+          - {label: s5-drpc, wallet: "4YrqTrUJ7JMNTPvRJeRN3TGxQ4KiPz7tom83XJN6aUa1", rpc: "https://solana.drpc.org/"}
+          - {label: s6-mainnet, wallet: "wae8YMC7PWjcPbM3mdx3CUDZEkkjaFAE4VxS5mF2YuN", rpc: "https://api.mainnet.solana.com"}
+          - {label: s6-publicnode, wallet: "wae8YMC7PWjcPbM3mdx3CUDZEkkjaFAE4VxS5mF2YuN", rpc: "https://solana-rpc.publicnode.com"}
+          - {label: s6-drpc, wallet: "wae8YMC7PWjcPbM3mdx3CUDZEkkjaFAE4VxS5mF2YuN", rpc: "https://solana.drpc.org/"}
+          - {label: s10-mainnet, wallet: "2ksQ77e9e5SS6VA6poanRGWfkU3R4R5wZnptbJHb2nx9", rpc: "https://api.mainnet.solana.com"}
+          - {label: s10-publicnode, wallet: "2ksQ77e9e5SS6VA6poanRGWfkU3R4R5wZnptbJHb2nx9", rpc: "https://solana-rpc.publicnode.com"}
+          - {label: s10-drpc, wallet: "2ksQ77e9e5SS6VA6poanRGWfkU3R4R5wZnptbJHb2nx9", rpc: "https://solana.drpc.org/"}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Probe exact Sep16 window
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python diagnose_signature_window.py \
+            --wallet "${{ matrix.wallet }}" \
+            --rpc "${{ matrix.rpc }}" \
+            --start-ts 1789488000 \
+            --end-ts 1789574400 \
+            --max-pages 20 | tee "../${{ matrix.label }}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "${{ matrix.label }}"
+          path: "${{ matrix.label }}.txt"
+          if-no-files-found: error
