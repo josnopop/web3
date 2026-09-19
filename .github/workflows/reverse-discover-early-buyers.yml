@@ -1,0 +1,56 @@
+name: reverse-discover-anonymous-early-buyers
+
+on:
+  push:
+    branches: [feat/wallet-discovery-v03]
+    paths:
+      - "sol-alpha-wallet-discovery/historical_priority_mints.json"
+      - "sol-alpha-wallet-discovery/reverse_discover_early_buyers.py"
+      - "sol-alpha-wallet-discovery/merge_early_buyers.py"
+      - ".github/workflows/reverse-discover-early-buyers.yml"
+  workflow_dispatch:
+
+jobs:
+  scan:
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        index: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install solders
+      - name: Recover first buyers
+        working-directory: sol-alpha-wallet-discovery
+        run: python reverse_discover_early_buyers.py --index ${{ matrix.index }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: early-buyers-${{ matrix.index }}
+          path: sol-alpha-wallet-discovery/out/2026-09-15/early_buyers_*.json
+          if-no-files-found: error
+  merge:
+    needs: scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: early-buyers-*
+          path: early-input
+          merge-multiple: true
+      - name: Aggregate repeat early buyers
+        working-directory: sol-alpha-wallet-discovery
+        run: python merge_early_buyers.py --input ../early-input
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anonymous-early-buyer-candidates-2026-09-15
+          path: sol-alpha-wallet-discovery/out/2026-09-15/anonymous_early_buyer_candidates.json
+          if-no-files-found: error
