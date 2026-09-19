@@ -6,8 +6,10 @@ on:
       - ".github/workflows/s-wallet-priority4-v2.yml"
       - "sol-alpha-wallet-discovery/s_priority4_2026_09_19.json"
       - "sol-alpha-wallet-discovery/history_rescore.py"
-      - "sol-alpha-wallet-discovery/build_wallet_history_cache.py"\n      - "sol-alpha-wallet-discovery/s_fast15_filter.py"
+      - "sol-alpha-wallet-discovery/build_wallet_history_cache.py"
+      - "sol-alpha-wallet-discovery/s_fast15_filter.py"
   workflow_dispatch:
+
 jobs:
   validate:
     strategy:
@@ -15,28 +17,30 @@ jobs:
       matrix:
         shard: [0,1,2,3]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Validate one priority S candidate
+      - name: Validate one priority S candidate over 15d
         working-directory: sol-alpha-wallet-discovery
         run: |
           python build_wallet_history_cache.py \
             --candidates s_priority4_2026_09_19.json \
             --start-date 2026-09-04 --end-date 2026-09-19 \
-            --shard ${{ matrix.shard }} --shards 4 --pages 20 \
+            --shard ${{ matrix.shard }} --shards 4 --pages 12 \
             --out out/s_priority4/shard_${{ matrix.shard }}.json
       - uses: actions/upload-artifact@v4
         with:
           name: s-priority4-${{ matrix.shard }}
           path: sol-alpha-wallet-discovery/out/s_priority4/shard_${{ matrix.shard }}.json
           if-no-files-found: error
+
   qualify:
     needs: validate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,13 +51,15 @@ jobs:
           pattern: s-priority4-*
           path: sol-alpha-wallet-discovery/out/s_priority4
           merge-multiple: true
-      - name: Score priority wallets and keep strict S only
+      - name: 7d freshness + 15d S qualification
         working-directory: sol-alpha-wallet-discovery
         run: |
-          python score_wallet_cache.py --cache out/s_priority4 --cutoff-date 2026-09-19 --out out/s_priority4/scored.json
-          python s_wallet_filter.py --scores out/s_priority4/scored.json --out out/s_priority4/S_WALLETS.json
+          python s_fast15_filter.py \
+            --cache out/s_priority4 \
+            --cutoff-date 2026-09-19 \
+            --out out/s_priority4/S_WALLETS_FAST15.json
       - uses: actions/upload-artifact@v4
         with:
-          name: S-PRIORITY4-FINAL
+          name: S-PRIORITY4-FAST15
           path: sol-alpha-wallet-discovery/out/s_priority4/
           if-no-files-found: error
