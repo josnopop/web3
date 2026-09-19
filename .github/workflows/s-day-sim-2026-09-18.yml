@@ -3,7 +3,7 @@ on:
   push:
     branches: [feat/wallet-discovery-v03]
     paths:
-      - ".github/workflows/s-day-sim-2026-09-18.yml"
+      - ".github/workflows/s-day-sim-2026-09-18.yml"\n      - "sol-alpha-wallet-discovery/s_day_replay_fast.py"\n      - "sol-alpha-wallet-discovery/s_day_simulate.py"\n      - "sol-alpha-wallet-discovery/s_simple12_2026_09_19.json"
   workflow_dispatch:
 
 concurrency:
