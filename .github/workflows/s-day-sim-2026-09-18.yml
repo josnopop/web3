@@ -24,13 +24,13 @@ jobs:
         working-directory: sol-alpha-wallet-discovery
         run: |
           mkdir -p out/s_day_0918/replays
-          python s_day_replay.py --pool s_simple12_2026_09_19.json --date 2026-09-18 --shard 0 --shards 4 --pages 4 --out out/s_day_0918/replays/shard_0.json &
+          python s_day_replay_fast.py --pool s_simple12_2026_09_19.json --date 2026-09-18 --shard 0 --shards 4 --pages 4 --batch-size 20 --out out/s_day_0918/replays/shard_0.json &
           p0=$!
-          python s_day_replay.py --pool s_simple12_2026_09_19.json --date 2026-09-18 --shard 1 --shards 4 --pages 4 --out out/s_day_0918/replays/shard_1.json &
+          python s_day_replay_fast.py --pool s_simple12_2026_09_19.json --date 2026-09-18 --shard 1 --shards 4 --pages 4 --batch-size 20 --out out/s_day_0918/replays/shard_1.json &
           p1=$!
-          python s_day_replay.py --pool s_simple12_2026_09_19.json --date 2026-09-18 --shard 2 --shards 4 --pages 4 --out out/s_day_0918/replays/shard_2.json &
+          python s_day_replay_fast.py --pool s_simple12_2026_09_19.json --date 2026-09-18 --shard 2 --shards 4 --pages 4 --batch-size 20 --out out/s_day_0918/replays/shard_2.json &
           p2=$!
-          python s_day_replay.py --pool s_simple12_2026_09_19.json --date 2026-09-18 --shard 3 --shards 4 --pages 4 --out out/s_day_0918/replays/shard_3.json &
+          python s_day_replay_fast.py --pool s_simple12_2026_09_19.json --date 2026-09-18 --shard 3 --shards 4 --pages 4 --batch-size 20 --out out/s_day_0918/replays/shard_3.json &
           p3=$!
           wait $p0 $p1 $p2 $p3
 
