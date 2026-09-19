@@ -429,6 +429,52 @@ def codex_candidates(limit: int = 100) -> list[Evidence]:
 
 
 
+def arkham_candidates(mints: list[str], per_token_limit: int = 100) -> list[Evidence]:
+    key = os.getenv("ARKHAM_API_KEY")
+    if not key:
+        raise RuntimeError("missing ARKHAM_API_KEY")
+    evidence: dict[str, Evidence] = {}
+    for mint in mints:
+        payload = _request_json(
+            f"https://api.arkm.com/token/holders/solana/{mint}",
+            headers={"API-Key": key},
+        )
+        wallets = sorted(_walk_wallets(payload))[:per_token_limit]
+        for wallet in wallets:
+            hit = {"mint": mint}
+            if wallet not in evidence:
+                evidence[wallet] = Evidence(
+                    wallet, "Arkham Intel", "token_holder", True, {"tokens": [hit]}
+                )
+            else:
+                evidence[wallet].metadata.setdefault("tokens", []).append(hit)
+        time.sleep(0.05)
+    return list(evidence.values())
+
+
+def dune_candidates() -> list[Evidence]:
+    key = os.getenv("DUNE_API_KEY")
+    raw_ids = os.getenv("DUNE_QUERY_IDS", "")
+    ids = [x.strip() for x in raw_ids.split(",") if x.strip().isdigit()]
+    if not key or not ids:
+        raise RuntimeError("missing DUNE_API_KEY or DUNE_QUERY_IDS")
+    evidence: dict[str, Evidence] = {}
+    for query_id in ids:
+        payload = _request_json(
+            f"https://api.dune.com/api/v1/query/{query_id}/results",
+            headers={"X-Dune-API-Key": key},
+        )
+        for wallet in sorted(_walk_wallets(payload)):
+            hit = {"query_id": int(query_id)}
+            if wallet not in evidence:
+                evidence[wallet] = Evidence(
+                    wallet, "Dune", "query_result", True, {"queries": [hit]}
+                )
+            else:
+                evidence[wallet].metadata.setdefault("queries", []).append(hit)
+    return list(evidence.values())
+
+
 def gmgn_candidates(limit: int = 200) -> list[Evidence]:
     exe = shutil.which("gmgn-cli")
     if not exe:
@@ -488,6 +534,8 @@ def main():
     p.add_argument("--no-codex", action="store_true")
     p.add_argument("--no-bitquery", action="store_true")
     p.add_argument("--no-gmgn", action="store_true")
+    p.add_argument("--no-arkham", action="store_true")
+    p.add_argument("--no-dune", action="store_true")
     args = p.parse_args()
 
     mints: set[str] = set()
@@ -574,6 +622,18 @@ def main():
         "Codex/Axiom/Defined",
         not args.no_codex and bool(os.getenv("CODEX_API_KEY")),
         codex_candidates,
+    )
+    run_source(
+        "Arkham",
+        not args.no_arkham and bool(os.getenv("ARKHAM_API_KEY")) and bool(mints),
+        lambda: arkham_candidates(sorted(mints)[:30]),
+    )
+    run_source(
+        "Dune",
+        not args.no_dune
+        and bool(os.getenv("DUNE_API_KEY"))
+        and bool(os.getenv("DUNE_QUERY_IDS")),
+        dune_candidates,
     )
     run_source(
         "GMGN",
