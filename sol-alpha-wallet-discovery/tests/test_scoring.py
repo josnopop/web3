@@ -1,6 +1,9 @@
 import unittest
+from datetime import date, timezone
 
+from config import utc_window_for_local_day
 from scoring import WalletFeatures, WindowMetrics, freeze_snapshot, score_wallet
+from source_bridge import SourceCandidate, merge_candidates
 
 
 def wm(days, pnl, wins, closed, hold=30, same_slot=0.05, tpm=4, top1=0.25, top3=0.55):
@@ -37,6 +40,20 @@ class WalletScoringTests(unittest.TestCase):
         a = freeze_snapshot([s], {"freeze": "2026-09-15T16:00:00+00:00"})
         b = freeze_snapshot([s], {"freeze": "2026-09-15T16:00:00+00:00"})
         self.assertEqual(a, b)
+
+    def test_sep16_replay_freezes_at_sep16_midnight_utc8(self):
+        start, end = utc_window_for_local_day(date(2026, 9, 16))
+        self.assertEqual(start.astimezone(timezone.utc).isoformat(), "2026-09-15T16:00:00+00:00")
+        self.assertEqual(end.astimezone(timezone.utc).isoformat(), "2026-09-16T16:00:00+00:00")
+
+    def test_kol_or_smartmoney_label_never_adds_score_bonus(self):
+        merged = merge_candidates(
+            [SourceCandidate("11111111111111111111111111111111", "GMGN", "smartmoney")],
+            [SourceCandidate("11111111111111111111111111111111", "KOL", "kol")],
+        )
+        row = merged["11111111111111111111111111111111"]
+        self.assertEqual(row["bonus"], 0.0)
+        self.assertEqual(row["source_count"], 2)
 
 
 if __name__ == "__main__":
