@@ -10,6 +10,10 @@ on:
       - "sol-alpha-wallet-discovery/s_fast7_filter.py"
   workflow_dispatch:
 
+concurrency:
+  group: s-wallet-priority4-v2-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     strategy:
