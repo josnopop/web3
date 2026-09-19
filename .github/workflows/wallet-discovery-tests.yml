@@ -24,7 +24,7 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Syntax check
         working-directory: sol-alpha-wallet-discovery
-        run: python -m py_compile config.py scoring.py providers.py public_rpc_scan.py source_bridge.py bigquery_scan.py
+        run: python -m py_compile config.py scoring.py providers.py public_rpc_scan.py source_bridge.py multi_source_discovery.py bigquery_scan.py
       - name: Public Solana RPC network smoke
         working-directory: sol-alpha-wallet-discovery
         run: |
