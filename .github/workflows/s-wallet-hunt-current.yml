@@ -10,6 +10,10 @@ on:
       - "sol-alpha-wallet-discovery/build_wallet_history_cache.py"
   workflow_dispatch:
 
+concurrency:
+  group: s-wallet-hunt-current-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   discover:
     runs-on: ubuntu-latest
