@@ -169,6 +169,64 @@ def okx_candidates() -> list[Evidence]:
     return list(evidence.values())
 
 
+def dexscreener_seed_mints() -> set[str]:
+    mints: set[str] = set()
+    for endpoint in (
+        "https://api.dexscreener.com/token-profiles/latest/v1",
+        "https://api.dexscreener.com/token-profiles/recent-updates/v1",
+        "https://api.dexscreener.com/token-boosts/latest/v1",
+        "https://api.dexscreener.com/token-boosts/top/v1",
+    ):
+        payload = _request_json(endpoint)
+        rows = payload if isinstance(payload, list) else [payload]
+        for row in rows:
+            if not isinstance(row, dict) or str(row.get("chainId")).lower() != "solana":
+                continue
+            mint = row.get("tokenAddress")
+            if mint and SOL_ADDR_RE.fullmatch(mint):
+                mints.add(mint)
+    return mints
+
+
+def cielo_seed_mints(limit: int = 50) -> set[str]:
+    key = os.getenv("CIELO_API_KEY")
+    if not key:
+        raise RuntimeError("missing CIELO_API_KEY")
+    params = urllib.parse.urlencode({
+        "chain": "solana",
+        "interval": "1h",
+        "limit": min(limit, 50),
+    })
+    payload = _request_json(
+        "https://feed-api.cielo.finance/api/v1/trending-tokens?" + params,
+        headers={"X-API-KEY": key},
+    )
+    mints = _walk_mints(payload)
+    # Cielo responses can use generic address/token keys. Accept Solana-looking
+    # addresses from token-shaped records as seeds, never as wallet evidence.
+    if not mints:
+        def walk_token_addresses(obj: Any) -> set[str]:
+            found: set[str] = set()
+            if isinstance(obj, dict):
+                tokenish = any(x in str(k).lower() for k in obj for x in ("token", "mint", "contract"))
+                if tokenish:
+                    for k, v in obj.items():
+                        if (
+                            isinstance(v, str)
+                            and SOL_ADDR_RE.fullmatch(v)
+                            and str(k).lower() in ("address", "token", "token_address", "mint")
+                        ):
+                            found.add(v)
+                for v in obj.values():
+                    found.update(walk_token_addresses(v))
+            elif isinstance(obj, list):
+                for v in obj:
+                    found.update(walk_token_addresses(v))
+            return found
+        mints = walk_token_addresses(payload)
+    return mints
+
+
 def solanatracker_candidates(
     mints: list[str], per_token_limit: int = 100
 ) -> list[Evidence]:
