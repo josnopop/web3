@@ -3,14 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 import time
-import urllib.error
-import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
 from config import DEX_PROGRAM_IDS, QUOTE_MINTS, USDC, USDT, WSOL
+from public_rpc_scan import rpc_call
 
-PUBLICNODE_RPC = "https://solana-rpc.publicnode.com"
+OFFICIAL_RPC = "https://api.mainnet-beta.solana.com"
 
 
 def _pubkey(x):
@@ -93,63 +92,7 @@ def classify_asset(asset_delta, quotes, sol_delta):
     return None, None, 0.0
 
 
-def batch_transactions(signatures, rpc_url, batch_size=20, retries=6):
-    for start in range(0, len(signatures), batch_size):
-        chunk = signatures[start:start + batch_size]
-        payload = []
-        for i, sig in enumerate(chunk):
-            payload.append({
-                "jsonrpc": "2.0",
-                "id": i,
-                "method": "getTransaction",
-                "params": [
-                    sig,
-                    {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0},
-                ],
-            })
-        body = json.dumps(payload).encode("utf-8")
-        last = None
-        for attempt in range(retries):
-            req = urllib.request.Request(
-                rpc_url,
-                data=body,
-                headers={"content-type": "application/json"},
-                method="POST",
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=60) as r:
-                    result = json.loads(r.read().decode("utf-8"))
-                if not isinstance(result, list):
-                    raise RuntimeError(f"Batch RPC returned non-list: {type(result).__name__}")
-                by_id = {int(x.get("id")): x for x in result}
-                for i, sig in enumerate(chunk):
-                    item = by_id.get(i, {})
-                    if item.get("error"):
-                        yield sig, None, f"RPC error: {item['error']}"
-                    else:
-                        yield sig, item.get("result"), None
-                break
-            except urllib.error.HTTPError as e:
-                last = e
-                if e.code != 429 or attempt == retries - 1:
-                    for sig in chunk:
-                        yield sig, None, f"HTTPError {e.code}: {e}"
-                    break
-                wait = float(e.headers.get("Retry-After") or min(2 ** attempt, 20))
-                print(f"[batch] 429; retry {attempt + 1}/{retries} in {wait}s")
-                time.sleep(wait)
-            except Exception as e:
-                last = e
-                if attempt == retries - 1:
-                    for sig in chunk:
-                        yield sig, None, f"{type(e).__name__}: {e}"
-                    break
-                time.sleep(min(2 ** attempt, 20))
-        if last is None:
-            time.sleep(0.03)
-
-
-def decode_wallet_file(path: Path, rpc_url: str, batch_size: int):
+def decode_wallet_file(path: Path, rpc_url: str, sleep_s: float):
     src = json.loads(path.read_text(encoding="utf-8"))
     w = src["wallets"][0]
     wallet = w["address"]
@@ -159,46 +102,54 @@ def decode_wallet_file(path: Path, rpc_url: str, batch_size: int):
     no_swap = 0
 
     sigs = w.get("signatures") or []
-    for i, (sig, tx, error) in enumerate(
-        batch_transactions(sigs, rpc_url, batch_size=batch_size), 1
-    ):
-        if error:
-            errors.append({"signature": sig, "error": error})
-            continue
-        if not tx or tx.get("meta", {}).get("err") is not None:
-            continue
-        if not touches_dex(tx):
-            non_dex += 1
-            continue
-
-        meta = tx.get("meta") or {}
-        deltas = token_deltas(meta, wallet)
-        quotes = {m: d for m, d in deltas.items() if m in QUOTE_MINTS}
-        assets = {m: d for m, d in deltas.items() if m not in QUOTE_MINTS}
-        sol_delta = native_sol_delta(tx, wallet)
-
-        emitted = 0
-        for mint, delta in assets.items():
-            side, quote_mint, quote_amount = classify_asset(delta, quotes, sol_delta)
-            if not side:
+    for i, sig in enumerate(sigs, 1):
+        try:
+            tx = rpc_call(
+                "getTransaction",
+                [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}],
+                rpc_url,
+                timeout=45,
+                retries=8,
+            )
+            if not tx or tx.get("meta", {}).get("err") is not None:
                 continue
-            trades.append({
-                "wallet_name": w["name"],
-                "wallet": wallet,
-                "signature": sig,
-                "block_time": tx.get("blockTime"),
-                "slot": tx.get("slot"),
-                "side": side,
-                "token_mint": mint,
-                "token_delta": delta,
-                "quote_mint": quote_mint,
-                "quote_amount": quote_amount,
-                "native_sol_delta": sol_delta,
-                "fee_sol": (meta.get("fee") or 0) / 1e9,
-            })
-            emitted += 1
-        if emitted == 0:
-            no_swap += 1
+            if not touches_dex(tx):
+                non_dex += 1
+                continue
+
+            meta = tx.get("meta") or {}
+            deltas = token_deltas(meta, wallet)
+            quotes = {m: d for m, d in deltas.items() if m in QUOTE_MINTS}
+            assets = {m: d for m, d in deltas.items() if m not in QUOTE_MINTS}
+            sol_delta = native_sol_delta(tx, wallet)
+
+            emitted = 0
+            for mint, delta in assets.items():
+                side, quote_mint, quote_amount = classify_asset(delta, quotes, sol_delta)
+                if not side:
+                    continue
+                trades.append({
+                    "wallet_name": w["name"],
+                    "wallet": wallet,
+                    "signature": sig,
+                    "block_time": tx.get("blockTime"),
+                    "slot": tx.get("slot"),
+                    "side": side,
+                    "token_mint": mint,
+                    "token_delta": delta,
+                    "quote_mint": quote_mint,
+                    "quote_amount": quote_amount,
+                    "native_sol_delta": sol_delta,
+                    "fee_sol": (meta.get("fee") or 0) / 1e9,
+                })
+                emitted += 1
+            if emitted == 0:
+                no_swap += 1
+        except Exception as e:
+            errors.append({"signature": sig, "error": f"{type(e).__name__}: {e}"})
+
+        if sleep_s:
+            time.sleep(sleep_s)
         if i % 100 == 0:
             print(f"{w['name']}: decoded {i}/{len(sigs)}")
 
@@ -220,8 +171,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--input", required=True)
     p.add_argument("--out", required=True)
-    p.add_argument("--rpc", default=PUBLICNODE_RPC)
-    p.add_argument("--batch-size", type=int, default=20)
+    p.add_argument("--rpc", default=OFFICIAL_RPC)
+    p.add_argument("--sleep", type=float, default=0.28)
     args = p.parse_args()
 
     path = Path(args.input)
@@ -231,14 +182,16 @@ def main():
             raise SystemExit(f"Expected one JSON in {path}, found {len(files)}")
         path = files[0]
 
-    result = decode_wallet_file(path, args.rpc, args.batch_size)
+    result = decode_wallet_file(path, args.rpc, args.sleep)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    first_error = result["rpc_errors"][0]["error"] if result["rpc_errors"] else ""
     print(
         f"RESULT {result['wallet_name']}: tx={result['input_successful_transactions']} "
         f"dex_rows={result['dex_swap_rows']} buys={result['buy_rows']} "
-        f"sells={result['sell_rows']} errors={len(result['rpc_errors'])}"
+        f"sells={result['sell_rows']} errors={len(result['rpc_errors'])} "
+        f"first_error={first_error[:120]}"
     )
 
 
