@@ -8,7 +8,7 @@ from decode_wallet_trades import token_deltas,native_sol_delta
 
 W="2ksQ77e9e5SS6VA6poanRGWfkU3R4R5wZnptbJHb2nx9"
 SIG_RPC="https://api.mainnet.solana.com"
-RPCS=["https://api.mainnet.solana.com","https://solana-rpc.publicnode.com","https://solana.drpc.org/"]
+RPCS=["https://api.mainnet-beta.solana.com","https://api.mainnet.solana.com","https://solana-rpc.publicnode.com","https://solana.drpc.org/"]
 
 def post_batch(url,sigs):
     payload=json.dumps([{"jsonrpc":"2.0","id":i,"method":"getTransaction","params":[s,{"encoding":"jsonParsed","maxSupportedTransactionVersion":0}]} for i,s in enumerate(sigs)]).encode()
