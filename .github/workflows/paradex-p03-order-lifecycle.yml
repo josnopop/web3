@@ -1,0 +1,127 @@
+name: Paradex P03 Minimal Order Lifecycle
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  p03:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pinned official Paradex SDK
+        run: python -m pip install --disable-pip-version-check "paradex-py==0.7.0"
+      - name: Place query and cancel one non-marketable BTC order
+        shell: bash
+        env:
+          PARADEX_ENVIRONMENT: nightly
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import secrets
+          import time
+          from decimal import Decimal
+
+          from paradex_py import Paradex
+          from paradex_py.common.order import Order, OrderSide, OrderType
+          from paradex_py.environment import NIGHTLY
+          from starknet_py.constants import EC_ORDER
+
+          if os.environ.get("PARADEX_L1_PRIVATE_KEY") or os.environ.get("PARADEX_L2_PRIVATE_KEY"):
+              raise RuntimeError("P03 refuses externally supplied private keys")
+
+          private_key = secrets.randbelow(EC_ORDER - 1) + 1
+          client = Paradex(
+              env=NIGHTLY,
+              l1_address="0x" + secrets.token_hex(20),
+              l2_private_key=hex(private_key),
+              server_derive_address=True,
+              ws_url_override="wss://ws.api.nightly.paradex.trade/v1",
+          )
+          private_key = None
+
+          deadline = time.monotonic() + 600
+          funded = False
+          while time.monotonic() < deadline:
+              balances = client.api_client.fetch_balances()
+              usdc = next((float(row.get("size", 0)) for row in balances.get("results", []) if row.get("token") == "USDC"), 0.0)
+              if usdc >= 10:
+                  funded = True
+                  break
+              time.sleep(10)
+          if not funded:
+              raise RuntimeError("nightly faucet did not provide test USDC")
+
+          client_id = "p03_" + secrets.token_hex(8)
+          order = Order(
+              market="BTC-USD-PERP",
+              order_type=OrderType.Limit,
+              order_side=OrderSide.Buy,
+              size=Decimal("0.001"),
+              limit_price=Decimal("10000"),
+              client_id=client_id,
+              instruction="POST_ONLY",
+              reduce_only=False,
+          )
+
+          order_id = None
+          cancelled = False
+          fetched_by_id = False
+          fetched_by_client_id = False
+          final_status = "UNKNOWN"
+          try:
+              submitted = client.api_client.submit_order(order)
+              order_id = submitted.get("id")
+              if not order_id:
+                  raise RuntimeError("submit response missing order id")
+
+              by_id = client.api_client.fetch_order(order_id=order_id)
+              by_client = client.api_client.fetch_order_by_client_id(client_id=client_id)
+              fetched_by_id = by_id.get("id") == order_id
+              fetched_by_client_id = by_client.get("id") == order_id
+              if not fetched_by_id or not fetched_by_client_id:
+                  raise RuntimeError("order lookup mismatch")
+
+              client.api_client.cancel_order(order_id)
+              for _ in range(20):
+                  current = client.api_client.fetch_order(order_id=order_id)
+                  final_status = str(current.get("status", "UNKNOWN"))
+                  if final_status == "CLOSED":
+                      cancelled = True
+                      break
+                  time.sleep(0.5)
+              if not cancelled:
+                  raise RuntimeError("order did not reach CLOSED after cancel")
+          finally:
+              if order_id and not cancelled:
+                  try:
+                      client.api_client.cancel_order(order_id)
+                  except Exception:
+                      pass
+
+          result = {
+              "environment": "PARADEX_NIGHTLY_SANDBOX",
+              "market": "BTC-USD-PERP",
+              "order_type": "LIMIT",
+              "instruction": "POST_ONLY",
+              "size": "0.001",
+              "limit_price": "10000",
+              "fetched_by_id": fetched_by_id,
+              "fetched_by_client_id": fetched_by_client_id,
+              "cancelled": cancelled,
+              "final_status": final_status,
+              "ephemeral_wallet": True,
+              "private_key_logged": False,
+              "private_key_persisted": False,
+              "real_funds_used": False,
+          }
+          print("P03_RESULT=" + json.dumps(result, sort_keys=True))
+          PY
