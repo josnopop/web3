@@ -4,7 +4,7 @@ on:
     branches: [feat/wallet-discovery-v03]
     paths:
       - ".github/workflows/s-historical-elite-v2.yml"
-      - "sol-alpha-wallet-discovery/s_historical_elite_2026_09_19.json"
+      - "sol-alpha-wallet-discovery/s_historical_elite_2026_09_19.json"\n      - "sol-alpha-wallet-discovery/s_fast15_filter.py"
   workflow_dispatch:
 jobs:
   validate:
@@ -23,7 +23,7 @@ jobs:
         run: |
           python build_wallet_history_cache.py \
             --candidates s_historical_elite_2026_09_19.json \
-            --start-date 2026-08-20 --end-date 2026-09-19 \
+            --start-date 2026-09-04 --end-date 2026-09-19 \
             --shard ${{ matrix.shard }} --shards 8 --pages 20 \
             --out out/s_elite/shard_${{ matrix.shard }}.json
       - uses: actions/upload-artifact@v4
