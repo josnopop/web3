@@ -1,0 +1,59 @@
+{
+  "purpose": "historically strong wallets for strict S revalidation",
+  "wallets": [
+    {
+      "wallet": "As7HjL7dzzvbRbaD3WCun47robib2kmAKRXMvjHkSMB5",
+      "name": "Otta",
+      "snapshot_wr30": 0.929,
+      "snapshot_roi30": 1.307,
+      "snapshot_trades30": 217
+    },
+    {
+      "wallet": "EDXHdSFdadFbYFFjxPXBqMe1kCEDFqpPu552uvp48HR8",
+      "name": "Clown",
+      "snapshot_wr30": 0.828,
+      "snapshot_roi30": 1.383,
+      "snapshot_trades30": 1780
+    },
+    {
+      "wallet": "B32QbbdDAyhvUQzjcaM5j6ZVKwjCxAwGH5Xgvb9SJqnC",
+      "name": "Kadenox",
+      "snapshot_wr30": 0.882,
+      "snapshot_roi30": 1.135,
+      "snapshot_trades30": 1543
+    },
+    {
+      "wallet": "H31vEBxSJk1nQdUN11qZgZyhScyShhscKhvhZZU3dQoU",
+      "name": "Megga",
+      "snapshot_wr30": 0.817,
+      "snapshot_roi30": 1.05,
+      "snapshot_trades30": 1213
+    },
+    {
+      "wallet": "JDd3hy3gQn2V982mi1zqhNqUw1GfV2UL6g76STojCJPN",
+      "name": "West",
+      "snapshot_wr30": 0.783,
+      "snapshot_roi30": 0.243,
+      "snapshot_trades30": 978
+    },
+    {
+      "wallet": "qNGhUruCGJpXJdsnV74USHErcbm3CrXRsnP8D6Z34Hh",
+      "name": "Dan",
+      "snapshot_wr30": 0.724,
+      "snapshot_roi30": 0.379,
+      "snapshot_trades30": 573
+    },
+    {
+      "wallet": "2fg5QD1eD7rzNNCsvnhmXFm5hqNgwTTG8p7kQ6f3rx6f",
+      "name": "Cupsey",
+      "snapshot_wr30": 0.9425,
+      "snapshot_trades30": 2346
+    },
+    {
+      "wallet": "5YRgrP3mjGzrzirYYN5HAQH19cTYREYwGxW6XRJQUzij",
+      "name": "slingoor",
+      "recent_daily_profit_sol": 779.01,
+      "recent_daily_wr": 0.8718
+    }
+  ]
+}
