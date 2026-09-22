@@ -50,6 +50,14 @@ def dec(value):
         return Decimal("0")
 
 
+def normalize_event(value):
+    raw = str(value or "unknown")
+    return {
+        "transfer_in": "transferIn",
+        "transfer_out": "transferOut",
+    }.get(raw, raw)
+
+
 class TestGMGNStage3Live(unittest.TestCase):
     def test_wallet_activity_profit_concentration_and_transfers(self):
         key = demo_key()
@@ -65,8 +73,7 @@ class TestGMGNStage3Live(unittest.TestCase):
         )
         self.assertEqual(status, 200)
         self.assertEqual(payload.get("code"), 0, payload)
-        data = payload.get("data") or {}
-        rows = data.get("activities") or []
+        rows = (payload.get("data") or {}).get("activities") or []
 
         counts = defaultdict(int)
         pnl_by_token = defaultdict(Decimal)
@@ -75,12 +82,10 @@ class TestGMGNStage3Live(unittest.TestCase):
 
         for row in rows:
             fields.update(row.keys())
-            event = row.get("event_type") or row.get("type") or "unknown"
+            event = normalize_event(row.get("event_type") or row.get("type"))
             counts[event] += 1
             if event == "sell":
-                proceeds = dec(row.get("cost_usd"))
-                basis = dec(row.get("buy_cost_usd"))
-                pnl = proceeds - basis
+                pnl = dec(row.get("cost_usd")) - dec(row.get("buy_cost_usd"))
                 sell_pnls.append(pnl)
                 token = (row.get("token") or {}).get("address") or "unknown"
                 pnl_by_token[token] += pnl
