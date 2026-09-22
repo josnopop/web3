@@ -5,7 +5,7 @@ import unittest
 import urllib.parse
 import urllib.request
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 
@@ -83,21 +83,28 @@ class TestGMGNStage4Live(unittest.TestCase):
         self.assertEqual(payload.get("code"), 0, payload)
         rows = (payload.get("data") or {}).get("list") or []
 
-        buys = []
+        now = int(time.time())
+        all_buys = []
         seen_tokens = set()
         for row in sorted(rows, key=lambda r: r.get("timestamp") or 0, reverse=True):
             token = row.get("base_address")
+            ts = int(row.get("timestamp") or 0)
             if row.get("side") != "buy" or not token or token in seen_tokens:
                 continue
             if not row.get("transaction_hash"):
                 continue
+            age = now - ts
+            if age < 8 or age > 180:
+                continue
             seen_tokens.add(token)
-            buys.append(row)
-            if len(buys) >= 4:
-                break
+            item = dict(row)
+            item["_age"] = age
+            all_buys.append(item)
 
+        buys = all_buys[:4]
         print(f"GMGN_STAGE4_GMGN_ELAPSED_MS={gmgn_ms}")
         print(f"GMGN_STAGE4_CANDIDATE_BUYS={len(buys)}")
+        print("GMGN_STAGE4_CANDIDATE_AGES=" + ",".join(str(x["_age"]) for x in buys))
 
         matched = None
         gt_calls = 0
@@ -136,32 +143,35 @@ class TestGMGNStage4Live(unittest.TestCase):
                     f"exact={bool(exact)}"
                 )
                 if exact:
-                    matched = (cand, pool_addr, trades, exact)
-                    break
+                    entry_ts = iso_ts(exact.get("block_timestamp")) or int(cand.get("timestamp") or 0)
+                    timeline = []
+                    for trade in trades:
+                        ts = iso_ts(trade.get("block_timestamp"))
+                        price = token_price_usd(trade, token)
+                        if ts is not None and price is not None and price > 0:
+                            timeline.append((ts, price, trade.get("tx_hash")))
+                    timeline.sort(key=lambda x: x[0])
+                    later_count = sum(1 for ts, _, _ in timeline if ts > entry_ts)
+                    if later_count > 0:
+                        matched = (cand, pool_addr, timeline, exact)
+                        break
             if matched:
                 break
 
         print(f"GMGN_STAGE4_GT_CALLS={gt_calls}")
-        self.assertIsNotNone(matched, "No exact GMGN Smart Money tx found in sampled GeckoTerminal pools")
+        self.assertIsNotNone(matched, "No replayable Smart Money tx found in sampled pools")
 
-        cand, pool_addr, trades, entry_trade = matched
+        cand, pool_addr, timeline, entry_trade = matched
         token = cand["base_address"]
         entry_ts = iso_ts(entry_trade.get("block_timestamp")) or int(cand.get("timestamp") or 0)
         entry_price = token_price_usd(entry_trade, token) or dec(cand.get("price_usd"))
         self.assertIsNotNone(entry_price)
         self.assertGreater(entry_price, 0)
 
-        timeline = []
-        for trade in trades:
-            ts = iso_ts(trade.get("block_timestamp"))
-            price = token_price_usd(trade, token)
-            if ts is not None and price is not None and price > 0:
-                timeline.append((ts, price, trade.get("tx_hash")))
-        timeline.sort(key=lambda x: x[0])
-
         print(f"GMGN_STAGE4_MATCH_TOKEN={token}")
         print(f"GMGN_STAGE4_MATCH_POOL={pool_addr}")
         print(f"GMGN_STAGE4_MATCH_TX={cand.get('transaction_hash')}")
+        print(f"GMGN_STAGE4_ENTRY_AGE_S={cand.get('_age')}")
         print(f"GMGN_STAGE4_ENTRY_TS={entry_ts}")
         print(f"GMGN_STAGE4_ENTRY_PRICE_USD={entry_price}")
         print(f"GMGN_STAGE4_TRADE_TIMELINE_ROWS={len(timeline)}")
