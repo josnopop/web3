@@ -1,0 +1,21 @@
+name: shadow-gnbb-repair-missing
+on:
+  push:
+    branches: [shadow-gnbb-20260918]
+    paths:
+      - ".github/workflows/shadow-gnbb-repair-missing.yml"
+      - "sol-alpha-wallet-discovery/gnbb_repair_missing.py"
+      - "sol-alpha-wallet-discovery/gnbb_missing_35.json"
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repair missing transactions
+        working-directory: sol-alpha-wallet-discovery
+        run: python gnbb_repair_missing.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shadow-gnbb-repair
+          path: sol-alpha-wallet-discovery/gnbb_repair.json
