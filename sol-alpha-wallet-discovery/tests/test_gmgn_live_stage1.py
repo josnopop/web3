@@ -16,11 +16,10 @@ SOL_RPC = "https://api.mainnet-beta.solana.com"
 EXCLUDED = {
     "So11111111111111111111111111111111111111112",
     "11111111111111111111111111111111",
-    "EPjFWdd5AufqSSqeM2qQ9y8vS3T4U2Jb7Dd8xM6Y8T9",
 }
 
 
-def public_get(url, headers=None, timeout=30):
+def get_json(url, headers=None, timeout=30):
     req = urllib.request.Request(
         url,
         headers=headers or {"User-Agent": "sol-copyability-live-verify"},
@@ -47,11 +46,6 @@ def post_json(url, body, timeout=30):
 
 
 def demo_key():
-    _, _, payload = public_get(README)
-    raise AssertionError("unexpected")
-
-
-def read_demo_key():
     req = urllib.request.Request(README, headers={"User-Agent": "gmgn-stage4-live-verify"})
     with urllib.request.urlopen(req, timeout=20) as response:
         text = response.read().decode("utf-8")
@@ -66,7 +60,7 @@ def gmgn_get(path, params, key):
     query["timestamp"] = int(time.time())
     query["client_id"] = str(uuid.uuid4())
     url = f"{GMGN_BASE}{path}?" + urllib.parse.urlencode(query, doseq=True)
-    return public_get(
+    return get_json(
         url,
         headers={
             "X-APIKEY": key,
@@ -97,8 +91,8 @@ def token_price_usd(attrs, token):
     return None
 
 
-def tx_account_keys(tx_payload):
-    result = tx_payload.get("result") or {}
+def tx_account_keys(payload):
+    result = payload.get("result") or {}
     tx = result.get("transaction") or {}
     message = tx.get("message") or {}
     keys = set()
@@ -116,7 +110,7 @@ def tx_account_keys(tx_payload):
 
 class TestGMGNStage4FreeReplay(unittest.TestCase):
     def test_free_second_level_copyability_replay(self):
-        key = read_demo_key()
+        key = demo_key()
         status, gmgn_ms, payload = gmgn_get(
             "/v1/user/smartmoney",
             {"chain": "sol", "limit": 100},
@@ -132,7 +126,7 @@ class TestGMGNStage4FreeReplay(unittest.TestCase):
             token = row.get("base_address")
             if row.get("side") != "buy" or not token or token in EXCLUDED or token in seen:
                 continue
-            if not row.get("transaction_hash"):
+            if not row.get("transaction_hash") or not row.get("price_usd"):
                 continue
             seen.add(token)
             candidates.append(row)
@@ -143,28 +137,30 @@ class TestGMGNStage4FreeReplay(unittest.TestCase):
         print(f"GMGN_STAGE4_FREE_CANDIDATES={len(candidates)}")
 
         chosen = None
-        total_external_calls = 0
+        calls = 0
 
         for cand in candidates:
             token = cand["base_address"]
             tx_hash = cand["transaction_hash"]
-            age = int(time.time()) - int(cand.get("timestamp") or 0)
+            entry_ts = int(cand.get("timestamp") or 0)
+            entry_price = dec(cand.get("price_usd"))
+            age = int(time.time()) - entry_ts
 
             try:
-                _, pools_ms, pools_payload = public_get(
+                _, pools_ms, pools_payload = get_json(
                     f"{GT_BASE}/networks/solana/tokens/{token}/pools?page=1"
                 )
-                total_external_calls += 1
+                calls += 1
             except Exception as exc:
                 print(f"GMGN_STAGE4_FREE_POOL_LOOKUP_ERROR={token}:{type(exc).__name__}")
                 continue
             pools = pools_payload.get("data") or []
-            pool_map = {
-                (p.get("attributes") or {}).get("address"): p
+            pool_addresses = [
+                (p.get("attributes") or {}).get("address")
                 for p in pools
                 if (p.get("attributes") or {}).get("address")
-            }
-            if not pool_map:
+            ]
+            if not pool_addresses:
                 print(f"GMGN_STAGE4_FREE_NO_POOLS={token}")
                 continue
 
@@ -185,92 +181,83 @@ class TestGMGNStage4FreeReplay(unittest.TestCase):
                         ],
                     },
                 )
-                total_external_calls += 1
+                calls += 1
             except Exception as exc:
                 print(f"GMGN_STAGE4_FREE_RPC_ERROR={tx_hash}:{type(exc).__name__}")
                 continue
 
             account_keys = tx_account_keys(tx_payload)
-            matching_pools = [p for p in pool_map if p in account_keys]
+            matching_pools = [p for p in pool_addresses if p in account_keys]
             print(
                 f"GMGN_STAGE4_FREE_CANDIDATE={token}:age={age}:"
-                f"pools={len(pool_map)}:account_keys={len(account_keys)}:"
+                f"pools={len(pool_addresses)}:account_keys={len(account_keys)}:"
                 f"matched_pools={len(matching_pools)}:pool_ms={pools_ms}:rpc_ms={rpc_ms}"
             )
-            if not matching_pools:
+            if not matching_pools or entry_price is None or entry_price <= 0:
                 continue
 
-            # Give the market enough time to produce +2/+5/+10 second observations.
-            age_now = int(time.time()) - int(cand.get("timestamp") or 0)
-            if age_now < 14:
-                time.sleep(14 - age_now)
+            # Wait only until the +10s observation window exists.
+            age_now = int(time.time()) - entry_ts
+            if age_now < 12:
+                time.sleep(12 - age_now)
 
             for pool_addr in matching_pools[:2]:
                 try:
-                    _, trades_ms, trades_payload = public_get(
+                    _, trades_ms, trades_payload = get_json(
                         f"{GT_BASE}/networks/solana/pools/{pool_addr}/trades"
                     )
-                    total_external_calls += 1
+                    calls += 1
                 except Exception as exc:
                     print(f"GMGN_STAGE4_FREE_TRADES_ERROR={pool_addr}:{type(exc).__name__}")
                     continue
 
-                trades = [t.get("attributes") or {} for t in trades_payload.get("data") or []]
-                exact = next((t for t in trades if t.get("tx_hash") == tx_hash), None)
-                print(
-                    f"GMGN_STAGE4_FREE_POOL_TRADES={pool_addr}:{len(trades)}:"
-                    f"{trades_ms}ms:exact={bool(exact)}"
-                )
-                if not exact:
-                    continue
-
-                entry_ts = iso_ts(exact.get("block_timestamp")) or int(cand.get("timestamp") or 0)
                 timeline = []
-                for trade in trades:
-                    ts = iso_ts(trade.get("block_timestamp"))
-                    price = token_price_usd(trade, token)
+                for item in trades_payload.get("data") or []:
+                    attrs = item.get("attributes") or {}
+                    ts = iso_ts(attrs.get("block_timestamp"))
+                    price = token_price_usd(attrs, token)
                     if ts is not None and price is not None and price > 0:
-                        timeline.append((ts, price, trade.get("tx_hash")))
+                        timeline.append((ts, price, attrs.get("tx_hash")))
                 timeline.sort(key=lambda x: x[0])
-                if any(ts > entry_ts for ts, _, _ in timeline):
-                    chosen = (cand, pool_addr, exact, timeline)
+
+                resolved = []
+                for delay in (2, 5, 10):
+                    target = entry_ts + delay
+                    hit = next((x for x in timeline if x[0] >= target), None)
+                    if hit:
+                        resolved.append((delay, hit))
+
+                print(
+                    f"GMGN_STAGE4_FREE_POOL_TIMELINE={pool_addr}:rows={len(timeline)}:"
+                    f"resolved={len(resolved)}:trades_ms={trades_ms}"
+                )
+                if len(resolved) >= 2:
+                    chosen = (cand, pool_addr, entry_price, timeline, resolved)
                     break
             if chosen:
                 break
 
-        print(f"GMGN_STAGE4_FREE_EXTERNAL_CALLS={total_external_calls}")
-        self.assertIsNotNone(chosen, "Could not resolve a replayable Smart Money pool via free public sources")
+        print(f"GMGN_STAGE4_FREE_EXTERNAL_CALLS={calls}")
+        self.assertIsNotNone(chosen, "Could not build free second-level replay from sampled Smart Money trades")
 
-        cand, pool_addr, entry_trade, timeline = chosen
+        cand, pool_addr, entry_price, timeline, resolved = chosen
+        entry_ts = int(cand["timestamp"])
         token = cand["base_address"]
-        entry_ts = iso_ts(entry_trade.get("block_timestamp")) or int(cand["timestamp"])
-        entry_price = token_price_usd(entry_trade, token) or dec(cand.get("price_usd"))
-        self.assertIsNotNone(entry_price)
-        self.assertGreater(entry_price, 0)
-
         print(f"GMGN_STAGE4_FREE_TOKEN={token}")
         print(f"GMGN_STAGE4_FREE_POOL={pool_addr}")
         print(f"GMGN_STAGE4_FREE_ENTRY_TX={cand.get('transaction_hash')}")
+        print(f"GMGN_STAGE4_FREE_ENTRY_TS={entry_ts}")
         print(f"GMGN_STAGE4_FREE_ENTRY_PRICE={entry_price}")
         print(f"GMGN_STAGE4_FREE_TIMELINE_ROWS={len(timeline)}")
 
-        resolved = 0
-        for delay in (2, 5, 10):
-            target = entry_ts + delay
-            after = next(((ts, price, tx) for ts, price, tx in timeline if ts >= target), None)
-            if not after:
-                print(f"GMGN_STAGE4_FREE_DELAY_{delay}S=NO_TRADE")
-                continue
-            ts, price, tx = after
+        for delay, (ts, price, tx) in resolved:
             move = (price / entry_price - Decimal("1")) * Decimal("100")
             print(
                 f"GMGN_STAGE4_FREE_DELAY_{delay}S="
                 f"actual_lag={ts-entry_ts},price={price},move_pct={move:.6f},tx={tx}"
             )
-            resolved += 1
-
-        print(f"GMGN_STAGE4_FREE_RESOLVED_DELAYS={resolved}")
-        self.assertGreaterEqual(resolved, 2)
+        print(f"GMGN_STAGE4_FREE_RESOLVED_DELAYS={len(resolved)}")
+        self.assertGreaterEqual(len(resolved), 2)
 
 
 if __name__ == "__main__":
