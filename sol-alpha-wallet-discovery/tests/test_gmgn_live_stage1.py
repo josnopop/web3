@@ -20,13 +20,19 @@ def demo_key():
     return match.group(1)
 
 
-def gmgn_get(path, params, key):
+def auth_url(path, params):
     query = dict(params)
     query["timestamp"] = int(time.time())
     query["client_id"] = str(uuid.uuid4())
-    encoded = urllib.parse.urlencode(query, doseq=True)
+    return f"{BASE}{path}?" + urllib.parse.urlencode(query, doseq=True)
+
+
+def gmgn_request(method, path, params, key, body=None):
+    encoded_body = None if body is None else json.dumps(body).encode("utf-8")
     request = urllib.request.Request(
-        f"{BASE}{path}?{encoded}",
+        auth_url(path, params),
+        data=encoded_body,
+        method=method,
         headers={
             "X-APIKEY": key,
             "Content-Type": "application/json",
@@ -35,17 +41,18 @@ def gmgn_get(path, params, key):
     )
     started = time.perf_counter()
     with urllib.request.urlopen(request, timeout=30) as response:
-        body = response.read().decode("utf-8")
+        raw = response.read().decode("utf-8")
         status = response.status
     elapsed_ms = round((time.perf_counter() - started) * 1000)
-    return status, elapsed_ms, json.loads(body)
+    return status, elapsed_ms, json.loads(raw)
 
 
 class TestGMGNLive(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.key = demo_key()
-        status, cls.stage1_ms, payload = gmgn_get(
+        status, cls.stage1_ms, payload = gmgn_request(
+            "GET",
             "/v1/user/smartmoney",
             {"chain": "sol", "limit": 200},
             cls.key,
@@ -59,7 +66,6 @@ class TestGMGNLive(unittest.TestCase):
 
     def test_01_solana_smartmoney_live(self):
         rows = self.smart_rows
-        makers = self.makers
         tokens = [r.get("base_address") for r in rows if r.get("base_address")]
         sides = {}
         tags = {}
@@ -73,72 +79,70 @@ class TestGMGNLive(unittest.TestCase):
         print("GMGN_STAGE1_HTTP_STATUS=200")
         print(f"GMGN_STAGE1_ELAPSED_MS={self.stage1_ms}")
         print(f"GMGN_STAGE1_RECORDS={len(rows)}")
-        print(f"GMGN_STAGE1_UNIQUE_MAKERS={len(makers)}")
+        print(f"GMGN_STAGE1_UNIQUE_MAKERS={len(self.makers)}")
         print(f"GMGN_STAGE1_UNIQUE_TOKENS={len(set(tokens))}")
         print("GMGN_STAGE1_SIDES=" + json.dumps(sides, sort_keys=True))
         print("GMGN_STAGE1_TAGS=" + json.dumps(tags, sort_keys=True))
         self.assertGreater(len(rows), 0)
-        self.assertGreater(len(makers), 0)
-
-    def test_02_batch_wallet_stats_7d(self):
         self.assertGreater(len(self.makers), 0)
-        status, elapsed_ms, payload = gmgn_get(
-            "/v1/user/wallet_stats",
+
+    def test_02_batch_wallet_profits_7d(self):
+        status, elapsed_ms, payload = gmgn_request(
+            "POST",
+            "/v1/user/wallet_profits",
+            {},
+            self.key,
             {
                 "chain": "sol",
-                "wallet_address": self.makers,
                 "period": "7d",
+                "wallet_addresses": self.makers,
             },
-            self.key,
         )
         self.assertEqual(status, 200)
         self.assertEqual(payload.get("code"), 0, payload)
+        data = payload.get("data") or {}
+        rows = data.get("list") or []
 
-        data = payload.get("data")
-        if isinstance(data, list):
-            rows = data
-        elif isinstance(data, dict):
-            rows = [data]
-        else:
-            rows = []
-
-        core = ("realized_profit", "winrate", "buy_count", "sell_count", "pnl")
-        with_core = sum(
+        fields = sorted({k for row in rows if isinstance(row, dict) for k in row})
+        with_profit = sum(
             1
             for row in rows
-            if isinstance(row, dict) and any(row.get(k) is not None for k in core)
+            if isinstance(row, dict) and row.get("realized_profit") is not None
         )
-        fields = sorted({k for row in rows if isinstance(row, dict) for k in row})
+        addresses = {r.get("wallet_address") for r in rows if r.get("wallet_address")}
 
         print(f"GMGN_STAGE2_INPUT_WALLETS={len(self.makers)}")
         print(f"GMGN_STAGE2_7D_HTTP_STATUS={status}")
         print(f"GMGN_STAGE2_7D_ELAPSED_MS={elapsed_ms}")
         print(f"GMGN_STAGE2_7D_ROWS={len(rows)}")
-        print(f"GMGN_STAGE2_7D_WITH_CORE_STATS={with_core}")
+        print(f"GMGN_STAGE2_7D_UNIQUE_WALLETS={len(addresses)}")
+        print(f"GMGN_STAGE2_7D_WITH_PROFIT={with_profit}")
         print("GMGN_STAGE2_7D_FIELDS=" + ",".join(fields))
-        if rows:
-            sample = rows[0]
-            sample_core = {
-                k: sample.get(k)
-                for k in (
-                    "wallet_address",
-                    "realized_profit",
-                    "unrealized_profit",
-                    "winrate",
-                    "total_cost",
-                    "buy_count",
-                    "sell_count",
-                    "pnl",
-                )
-                if k in sample
-            }
-            print(
-                "GMGN_STAGE2_7D_SAMPLE="
-                + json.dumps(sample_core, sort_keys=True)
+
+        preview = []
+        for row in rows[:5]:
+            preview.append(
+                {
+                    k: row.get(k)
+                    for k in (
+                        "wallet_address",
+                        "realized_profit",
+                        "realized_profit_cost",
+                        "buy",
+                        "sell",
+                        "unrealized_profit",
+                        "total_realized_profit",
+                        "total_profit",
+                        "total_cost",
+                    )
+                    if k in row
+                }
             )
+        print("GMGN_STAGE2_7D_PREVIEW=" + json.dumps(preview, sort_keys=True))
 
         self.assertGreater(len(rows), 0)
-        self.assertGreater(with_core, 0)
+        self.assertEqual(len(addresses), len(self.makers))
+        self.assertEqual(with_profit, len(rows))
 
 
 if __name__ == "__main__":
