@@ -1,0 +1,25 @@
+name: shadow-gnbb-20260918-parallel
+on:
+  push:
+    branches: [shadow-gnbb-20260918]
+    paths:
+      - ".github/workflows/shadow-gnbb-20260918-parallel.yml"
+jobs:
+  replay:
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [0,1,2,3,4,5,6,7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replay wallet partition
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          mkdir -p out/shadow_gnbb_parallel
+          python s_quote_replay.py --pool shadow_gnbb_2026_09_18.json --date 2026-09-18 --shard 0 --shards 1 --part ${{ matrix.part }} --parts 8 --out out/shadow_gnbb_parallel/part_${{ matrix.part }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shadow-gnbb-part-${{ matrix.part }}
+          path: sol-alpha-wallet-discovery/out/shadow_gnbb_parallel/part_${{ matrix.part }}.json
