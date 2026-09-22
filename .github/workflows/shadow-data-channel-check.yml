@@ -1,0 +1,21 @@
+name: shadow-data-channel-check
+on:
+  push:
+    branches: [shadow-gnbb-20260918]
+    paths:
+      - ".github/workflows/shadow-data-channel-check.yml"
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
+      BITQUERY_TOKEN: ${{ secrets.BITQUERY_TOKEN }}
+      SOLANATRACKER_API_KEY: ${{ secrets.SOLANATRACKER_API_KEY }}
+      BIRDEYE_API_KEY: ${{ secrets.BIRDEYE_API_KEY }}
+    steps:
+      - name: Check configured channels
+        shell: bash
+        run: |
+          for k in HELIUS_API_KEY BITQUERY_TOKEN SOLANATRACKER_API_KEY BIRDEYE_API_KEY; do
+            if [ -n "${!k}" ]; then echo "$k=PRESENT"; else echo "$k=MISSING"; fi
+          done
