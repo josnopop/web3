@@ -5,13 +5,13 @@ import unittest
 import urllib.parse
 import urllib.request
 import uuid
-from collections import defaultdict
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 
 README = "https://raw.githubusercontent.com/GMGNAI/gmgn-skills/main/Readme.md"
-BASE = "https://openapi.gmgn.ai"
-WALLET = "4mdMHfiMjBLNGwirfmVwH4N4B5LzPBqadqBrgkY6Z5q5"
+GMGN_BASE = "https://openapi.gmgn.ai"
+GT_BASE = "https://api.geckoterminal.com/api/v2"
 
 
 def demo_key():
@@ -23,100 +23,166 @@ def demo_key():
     return match.group(1)
 
 
-def get(path, params, key):
-    query = dict(params)
-    query["timestamp"] = int(time.time())
-    query["client_id"] = str(uuid.uuid4())
-    url = f"{BASE}{path}?" + urllib.parse.urlencode(query, doseq=True)
+def get_json(url, headers=None, timeout=30):
     req = urllib.request.Request(
         url,
-        headers={
-            "X-APIKEY": key,
-            "Content-Type": "application/json",
-            "User-Agent": "gmgn-stage3-live-verify",
-        },
+        headers=headers or {"User-Agent": "sol-copyability-live-verify"},
     )
     started = time.perf_counter()
-    with urllib.request.urlopen(req, timeout=30) as response:
+    with urllib.request.urlopen(req, timeout=timeout) as response:
         raw = response.read().decode("utf-8")
         status = response.status
     return status, round((time.perf_counter() - started) * 1000), json.loads(raw)
 
 
+def gmgn_get(path, params, key):
+    query = dict(params)
+    query["timestamp"] = int(time.time())
+    query["client_id"] = str(uuid.uuid4())
+    url = f"{GMGN_BASE}{path}?" + urllib.parse.urlencode(query, doseq=True)
+    return get_json(
+        url,
+        headers={
+            "X-APIKEY": key,
+            "Content-Type": "application/json",
+            "User-Agent": "gmgn-stage4-live-verify",
+        },
+    )
+
+
+def iso_ts(value):
+    if not value:
+        return None
+    return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp())
+
+
 def dec(value):
     try:
-        return Decimal(str(value or "0"))
-    except (InvalidOperation, ValueError):
-        return Decimal("0")
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
 
 
-def normalize_event(value):
-    raw = str(value or "unknown")
-    return {
-        "transfer_in": "transferIn",
-        "transfer_out": "transferOut",
-    }.get(raw, raw)
+def token_price_usd(attrs, token):
+    if attrs.get("from_token_address") == token:
+        return dec(attrs.get("price_from_in_usd"))
+    if attrs.get("to_token_address") == token:
+        return dec(attrs.get("price_to_in_usd"))
+    return None
 
 
-class TestGMGNStage3Live(unittest.TestCase):
-    def test_wallet_activity_profit_concentration_and_transfers(self):
+class TestGMGNStage4Live(unittest.TestCase):
+    def test_copyability_with_second_level_pool_trades(self):
         key = demo_key()
-        status, elapsed_ms, payload = get(
-            "/v1/user/wallet_activity",
-            {
-                "chain": "sol",
-                "wallet_address": WALLET,
-                "limit": 100,
-                "type": ["buy", "sell", "transferIn", "transferOut"],
-            },
+        status, gmgn_ms, payload = gmgn_get(
+            "/v1/user/smartmoney",
+            {"chain": "sol", "limit": 100},
             key,
         )
         self.assertEqual(status, 200)
         self.assertEqual(payload.get("code"), 0, payload)
-        rows = (payload.get("data") or {}).get("activities") or []
+        rows = (payload.get("data") or {}).get("list") or []
 
-        counts = defaultdict(int)
-        pnl_by_token = defaultdict(Decimal)
-        sell_pnls = []
-        fields = set()
+        buys = []
+        seen_tokens = set()
+        for row in sorted(rows, key=lambda r: r.get("timestamp") or 0, reverse=True):
+            token = row.get("base_address")
+            if row.get("side") != "buy" or not token or token in seen_tokens:
+                continue
+            if not row.get("transaction_hash"):
+                continue
+            seen_tokens.add(token)
+            buys.append(row)
+            if len(buys) >= 4:
+                break
 
-        for row in rows:
-            fields.update(row.keys())
-            event = normalize_event(row.get("event_type") or row.get("type"))
-            counts[event] += 1
-            if event == "sell":
-                pnl = dec(row.get("cost_usd")) - dec(row.get("buy_cost_usd"))
-                sell_pnls.append(pnl)
-                token = (row.get("token") or {}).get("address") or "unknown"
-                pnl_by_token[token] += pnl
+        print(f"GMGN_STAGE4_GMGN_ELAPSED_MS={gmgn_ms}")
+        print(f"GMGN_STAGE4_CANDIDATE_BUYS={len(buys)}")
 
-        positive_by_token = sorted(
-            (v for v in pnl_by_token.values() if v > 0),
-            reverse=True,
-        )
-        positive_total = sum(positive_by_token, Decimal("0"))
-        top1 = positive_by_token[0] if positive_by_token else Decimal("0")
-        top3 = sum(positive_by_token[:3], Decimal("0"))
-        top1_share = (top1 / positive_total) if positive_total > 0 else Decimal("0")
-        top3_share = (top3 / positive_total) if positive_total > 0 else Decimal("0")
-        net_sell_pnl = sum(sell_pnls, Decimal("0"))
+        matched = None
+        gt_calls = 0
 
-        print(f"GMGN_STAGE3_WALLET={WALLET}")
-        print(f"GMGN_STAGE3_HTTP_STATUS={status}")
-        print(f"GMGN_STAGE3_ELAPSED_MS={elapsed_ms}")
-        print(f"GMGN_STAGE3_ACTIVITY_ROWS={len(rows)}")
-        print("GMGN_STAGE3_EVENT_COUNTS=" + json.dumps(dict(counts), sort_keys=True))
-        print(f"GMGN_STAGE3_SELL_ROWS={len(sell_pnls)}")
-        print(f"GMGN_STAGE3_NET_SELL_PNL={net_sell_pnl}")
-        print(f"GMGN_STAGE3_POSITIVE_TOKEN_COUNT={len(positive_by_token)}")
-        print(f"GMGN_STAGE3_TOP1_POSITIVE_PROFIT_SHARE={float(top1_share):.6f}")
-        print(f"GMGN_STAGE3_TOP3_POSITIVE_PROFIT_SHARE={float(top3_share):.6f}")
-        print(f"GMGN_STAGE3_TRANSFER_IN_COUNT={counts.get('transferIn', 0)}")
-        print(f"GMGN_STAGE3_TRANSFER_OUT_COUNT={counts.get('transferOut', 0)}")
-        print("GMGN_STAGE3_FIELDS=" + ",".join(sorted(fields)))
+        for cand in buys:
+            token = cand["base_address"]
+            pools_url = f"{GT_BASE}/networks/solana/tokens/{token}/pools?page=1"
+            try:
+                _, pools_ms, pools_payload = get_json(pools_url)
+                gt_calls += 1
+            except Exception as exc:
+                print(f"GMGN_STAGE4_POOL_LOOKUP_ERROR={token}:{type(exc).__name__}")
+                continue
 
-        self.assertGreater(len(rows), 0)
-        self.assertGreater(counts.get("buy", 0) + counts.get("sell", 0), 0)
+            pools = pools_payload.get("data") or []
+            print(f"GMGN_STAGE4_TOKEN_POOL_COUNT={token}:{len(pools)}:{pools_ms}ms")
+            for pool in pools[:2]:
+                pool_addr = (pool.get("attributes") or {}).get("address")
+                if not pool_addr:
+                    continue
+                trades_url = f"{GT_BASE}/networks/solana/pools/{pool_addr}/trades"
+                try:
+                    _, trades_ms, trades_payload = get_json(trades_url)
+                    gt_calls += 1
+                except Exception as exc:
+                    print(f"GMGN_STAGE4_TRADES_ERROR={pool_addr}:{type(exc).__name__}")
+                    continue
+
+                trades = [t.get("attributes") or {} for t in (trades_payload.get("data") or [])]
+                exact = next(
+                    (t for t in trades if t.get("tx_hash") == cand.get("transaction_hash")),
+                    None,
+                )
+                print(
+                    f"GMGN_STAGE4_POOL_TRADES={pool_addr}:{len(trades)}:{trades_ms}ms:"
+                    f"exact={bool(exact)}"
+                )
+                if exact:
+                    matched = (cand, pool_addr, trades, exact)
+                    break
+            if matched:
+                break
+
+        print(f"GMGN_STAGE4_GT_CALLS={gt_calls}")
+        self.assertIsNotNone(matched, "No exact GMGN Smart Money tx found in sampled GeckoTerminal pools")
+
+        cand, pool_addr, trades, entry_trade = matched
+        token = cand["base_address"]
+        entry_ts = iso_ts(entry_trade.get("block_timestamp")) or int(cand.get("timestamp") or 0)
+        entry_price = token_price_usd(entry_trade, token) or dec(cand.get("price_usd"))
+        self.assertIsNotNone(entry_price)
+        self.assertGreater(entry_price, 0)
+
+        timeline = []
+        for trade in trades:
+            ts = iso_ts(trade.get("block_timestamp"))
+            price = token_price_usd(trade, token)
+            if ts is not None and price is not None and price > 0:
+                timeline.append((ts, price, trade.get("tx_hash")))
+        timeline.sort(key=lambda x: x[0])
+
+        print(f"GMGN_STAGE4_MATCH_TOKEN={token}")
+        print(f"GMGN_STAGE4_MATCH_POOL={pool_addr}")
+        print(f"GMGN_STAGE4_MATCH_TX={cand.get('transaction_hash')}")
+        print(f"GMGN_STAGE4_ENTRY_TS={entry_ts}")
+        print(f"GMGN_STAGE4_ENTRY_PRICE_USD={entry_price}")
+        print(f"GMGN_STAGE4_TRADE_TIMELINE_ROWS={len(timeline)}")
+
+        resolved = 0
+        for delay in (2, 5, 10):
+            target = entry_ts + delay
+            after = next(((ts, price, tx) for ts, price, tx in timeline if ts >= target), None)
+            if not after:
+                print(f"GMGN_STAGE4_DELAY_{delay}S=NO_LATER_TRADE")
+                continue
+            ts, price, tx = after
+            pct = (price / entry_price - Decimal("1")) * Decimal("100")
+            print(
+                f"GMGN_STAGE4_DELAY_{delay}S="
+                f"actual_lag={ts-entry_ts},price={price},move_pct={pct:.6f},tx={tx}"
+            )
+            resolved += 1
+
+        print(f"GMGN_STAGE4_RESOLVED_DELAYS={resolved}")
+        self.assertGreaterEqual(resolved, 2)
 
 
 if __name__ == "__main__":
