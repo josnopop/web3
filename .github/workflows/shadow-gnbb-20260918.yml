@@ -1,0 +1,27 @@
+name: shadow-gnbb-20260918
+on:
+  push:
+    branches: [shadow-gnbb-20260918]
+    paths:
+      - ".github/workflows/shadow-gnbb-20260918.yml"
+      - "sol-alpha-wallet-discovery/shadow_singleline_eval.py"
+      - "sol-alpha-wallet-discovery/shadow_gnbb_2026_09_18.json"
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replay wallet
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          mkdir -p out/shadow_gnbb
+          python s_quote_replay.py --pool shadow_gnbb_2026_09_18.json --date 2026-09-18 --shard 0 --shards 1 --out out/shadow_gnbb/raw.json
+      - name: Simulate locked single-line 50U shadow rule
+        working-directory: sol-alpha-wallet-discovery
+        run: |
+          python shadow_singleline_eval.py --input out/shadow_gnbb/raw.json --out out/shadow_gnbb/result.json --stake 50
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shadow-gnbb-result
+          path: sol-alpha-wallet-discovery/out/shadow_gnbb/
